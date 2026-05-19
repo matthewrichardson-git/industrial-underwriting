@@ -285,6 +285,13 @@ with st.sidebar:
     noi_growth = st.number_input("NOI Growth (%/yr)", min_value=0.0, max_value=10.0, value=2.0, step=0.25)
     exit_cap   = st.number_input("Exit Cap Rate (%)", min_value=0.0, max_value=20.0, value=7.0, step=0.25)
 
+    st.markdown('<div class="sidebar-section">CapEx & Leasing Costs</div>', unsafe_allow_html=True)
+    capex_psf          = st.number_input("CapEx Reserve ($/SF/yr)", min_value=0.0, value=0.35, step=0.05)
+    ti_new_psf         = st.number_input("TI — New Lease ($/SF)", min_value=0.0, value=8.00, step=0.50)
+    ti_renewal_psf     = st.number_input("TI — Renewal ($/SF)", min_value=0.0, value=3.00, step=0.50)
+    lc_pct             = st.number_input("Leasing Commission (%)", min_value=0.0, max_value=10.0, value=4.0, step=0.25)
+    new_lease_term_yrs = st.number_input("New Lease Term (yrs)", min_value=1, max_value=20, value=5, step=1)
+
 
 # ─────────────────────────────────────────────
 #  CORE CALCULATIONS (same as Session 2)
@@ -324,6 +331,73 @@ sale_proceeds     = sale_price - remaining_balance
 annual_cash_flows[-1] += sale_proceeds
 cash_flows        = [-equity_invested] + annual_cash_flows
 irr               = npf.irr(cash_flows)
+
+# ─────────────────────────────────────────────
+#  CAPEX / TI / LC MODEL
+# ─────────────────────────────────────────────
+def build_capex_schedule(sq_ft, hold_yrs, cap_psf,
+                         ti_new, ti_renew, lc_p, lease_term,
+                         rr_df=None, today=None):
+    from datetime import date as _date
+    if today is None:
+        today = _date.today()
+    schedule = {}
+    for yr in range(1, int(hold_yrs) + 1):
+        yr_costs = {}
+        # CapEx reserve — every year, non-discretionary
+        yr_costs["CapEx Reserve"] = sq_ft * cap_psf
+        if rr_df is not None:
+            yr_start = today.replace(year=today.year + yr - 1)
+            yr_end   = today.replace(year=today.year + yr)
+            rollovers = rr_df[
+                (rr_df["lease_end"] >= yr_start) &
+                (rr_df["lease_end"] <  yr_end)
+            ]
+            ti_cost = lc_cost = 0.0
+            for _, t in rollovers.iterrows():
+                sf   = t["sf"]
+                rp   = t["renewal_prob"]
+                mkt  = t["market_rent_psf"]
+                # Weighted TI: renewal_prob renew at lower TI, rest new at higher TI
+                ti_cost  += sf * (rp * ti_renew + (1 - rp) * ti_new)
+                # LC only on new leases
+                lc_cost  += sf * mkt * lease_term * (lc_p / 100) * (1 - rp)
+            yr_costs["Tenant Improvements"] = ti_cost
+            yr_costs["Leasing Commissions"] = lc_cost
+        else:
+            # No rent roll: assume 6% annual rollover, 70% renewal prob
+            annual_sf = sq_ft * 0.06
+            rp = 0.70
+            yr_costs["Tenant Improvements"] = annual_sf * (rp * ti_renew + (1 - rp) * ti_new)
+            yr_costs["Leasing Commissions"] = annual_sf * 6.50 * lease_term * (lc_p / 100) * (1 - rp)
+        schedule[yr] = yr_costs
+
+    annual_totals = {yr: sum(c.values()) for yr, c in schedule.items()}
+    total_capex = sum(v.get("CapEx Reserve", 0)        for v in schedule.values())
+    total_ti    = sum(v.get("Tenant Improvements", 0)  for v in schedule.values())
+    total_lc    = sum(v.get("Leasing Commissions", 0)  for v in schedule.values())
+    total_cost  = total_capex + total_ti + total_lc
+    return {
+        "schedule": schedule,
+        "annual_totals": annual_totals,
+        "total_capex":  total_capex,
+        "total_ti":     total_ti,
+        "total_lc":     total_lc,
+        "total_cost":   total_cost,
+        "psf_per_year": total_cost / sq_ft / hold_yrs if sq_ft > 0 else 0,
+    }
+
+capex_summary = build_capex_schedule(
+    square_feet, hold_years, capex_psf,
+    ti_new_psf, ti_renewal_psf, lc_pct, new_lease_term_yrs
+)
+
+# Adjusted IRR: subtract CapEx/TI/LC from each year's levered cash flow
+annual_capex_costs = [capex_summary["annual_totals"][yr] for yr in range(1, int(hold_years)+1)]
+adj_cf = [-equity_invested] + [
+    cf - cap for cf, cap in zip(annual_cash_flows, annual_capex_costs)
+]
+irr_adj = npf.irr(adj_cf)
 
 dscr_pass = dscr >= 1.25
 coc_pass  = cash_on_cash >= 0.07
@@ -527,7 +601,7 @@ st.markdown(f"""
 # ─────────────────────────────────────────────
 #  TABS — Pro Forma | Rent Roll
 # ─────────────────────────────────────────────
-tab1, tab2 = st.tabs(["Pro Forma", "Rent Roll"])
+tab1, tab2, tab3 = st.tabs(["Pro Forma", "Rent Roll", "CapEx & Returns"])
 
 
 # ═════════════════════════════════════════════
@@ -825,8 +899,8 @@ Cold Chain Logistics,12000,2023-01-01,2030-12-31,7.25,3.0,0.85,7.50,3"""
 
         styled = (
             display_df.style
-            .map(style_risk,  subset=["Risk"])
-            .map(style_mtm,   subset=["Mark-to-Mkt"])
+            .applymap(style_risk,  subset=["Risk"])
+            .applymap(style_mtm,   subset=["Mark-to-Mkt"])
             .set_properties(**{
                 "background-color": "#131929",
                 "color": "#E8E8E8",
@@ -938,3 +1012,204 @@ Cold Chain Logistics,12000,2023-01-01,2030-12-31,7.25,3.0,0.85,7.50,3"""
             </div>
         </div>
         """, unsafe_allow_html=True)
+
+
+# ═════════════════════════════════════════════
+#  TAB 3 — CAPEX & ADJUSTED RETURNS
+# ═════════════════════════════════════════════
+with tab3:
+
+    section("Capital Cost Summary")
+
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        metric_card(
+            "Total CapEx Reserve",
+            f"${capex_summary['total_capex']:,.0f}",
+            f"${capex_psf:.2f}/SF/yr × {hold_years:.0f} yrs"
+        )
+    with c2:
+        metric_card(
+            "Total TI Cost",
+            f"${capex_summary['total_ti']:,.0f}",
+            "Across all rollover events"
+        )
+    with c3:
+        metric_card(
+            "Total Leasing Commissions",
+            f"${capex_summary['total_lc']:,.0f}",
+            f"{lc_pct:.1f}% of new lease value"
+        )
+    with c4:
+        metric_card(
+            "Total Capital Cost",
+            f"${capex_summary['total_cost']:,.0f}",
+            f"${capex_summary['psf_per_year']:.2f}/SF/yr all-in"
+        )
+
+    # ── IRR comparison: unadjusted vs adjusted ─
+    section("IRR Impact — Before vs After Capital Costs")
+
+    c1, c2, c3 = st.columns(3)
+    irr_delta = irr_adj - irr
+    with c1:
+        metric_card(
+            "IRR — Before CapEx",
+            f"{irr:.1%}",
+            "Excludes TI, LC, and CapEx reserve"
+        )
+    with c2:
+        metric_card(
+            "IRR — After CapEx",
+            f"{irr_adj:.1%}",
+            "True levered IRR after all capital costs",
+            "metric-pass" if irr_adj >= 0.12 else "metric-fail"
+        )
+    with c3:
+        metric_card(
+            "IRR Drag",
+            f"{irr_delta:.1%}",
+            "Capital costs erode this much IRR",
+            "metric-warn" if abs(irr_delta) < 0.03 else "metric-fail"
+        )
+
+    st.markdown("""
+    <div style="background:var(--navy2);border:1px solid var(--border);border-left:3px solid var(--gold);
+                padding:0.75rem 1rem;border-radius:2px;font-size:0.78rem;color:var(--white-dim);margin:0.5rem 0 1rem 0;">
+        <strong style="color:var(--white);">Why this matters:</strong>
+        The unadjusted IRR (Pro Forma tab) only reflects NOI growth and exit value.
+        The adjusted IRR above is what your equity actually earns after writing checks for
+        tenant improvements, broker commissions, and capital reserves every time a lease rolls.
+        This is the number that goes in the IC memo.
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ── Year-by-year CapEx schedule ────────────
+    section("Annual Capital Cost Schedule")
+
+    years_list = list(range(1, int(hold_years) + 1))
+    capex_by_yr  = [capex_summary["schedule"][yr].get("CapEx Reserve", 0)        for yr in years_list]
+    ti_by_yr     = [capex_summary["schedule"][yr].get("Tenant Improvements", 0)  for yr in years_list]
+    lc_by_yr     = [capex_summary["schedule"][yr].get("Leasing Commissions", 0)  for yr in years_list]
+    total_by_yr  = [capex_summary["annual_totals"][yr]                            for yr in years_list]
+
+    CHART_LAYOUT = dict(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="#131929",
+        font=dict(family="DM Sans", color="#9AA0B0", size=11),
+        margin=dict(l=50, r=20, t=40, b=40),
+        xaxis=dict(
+            gridcolor="rgba(255,255,255,0.05)",
+            zerolinecolor="rgba(255,255,255,0.1)",
+            tickfont=dict(family="DM Mono", size=10)
+        ),
+        yaxis=dict(
+            gridcolor="rgba(255,255,255,0.05)",
+            zerolinecolor="rgba(255,255,255,0.1)",
+            tickfont=dict(family="DM Mono", size=10)
+        )
+    )
+
+    fig_capex = go.Figure()
+
+    # Stacked bars: CapEx + TI + LC by year
+    # Spikes show rollover years — makes the timing of capital calls visual
+    fig_capex.add_trace(go.Bar(
+        name="CapEx Reserve",
+        x=years_list, y=capex_by_yr,
+        marker_color="#4C6A9A",
+        marker_line_width=0,
+        hovertemplate="Year %{x}<br>CapEx Reserve: $%{y:,.0f}<extra></extra>"
+    ))
+    fig_capex.add_trace(go.Bar(
+        name="Tenant Improvements",
+        x=years_list, y=ti_by_yr,
+        marker_color="#C9A84C",
+        marker_line_width=0,
+        hovertemplate="Year %{x}<br>TI: $%{y:,.0f}<extra></extra>"
+    ))
+    fig_capex.add_trace(go.Bar(
+        name="Leasing Commissions",
+        x=years_list, y=lc_by_yr,
+        marker_color="#E74C3C",
+        marker_line_width=0,
+        hovertemplate="Year %{x}<br>LC: $%{y:,.0f}<extra></extra>"
+    ))
+
+    fig_capex.update_layout(
+        **CHART_LAYOUT,
+        title=dict(text="Capital Costs by Year", font=dict(size=12, color="#E8E8E8")),
+        barmode="stack",
+        yaxis_tickprefix="$",
+        yaxis_tickformat=",.0f",
+        legend=dict(
+            font=dict(family="DM Sans", size=10, color="#9AA0B0"),
+            bgcolor="rgba(0,0,0,0)",
+            orientation="h",
+            yanchor="bottom", y=1.02,
+            xanchor="left",   x=0
+        ),
+        bargap=0.25
+    )
+    st.plotly_chart(fig_capex, use_container_width=True)
+
+    # ── Cash flow bridge: NOI → Levered CF → Adjusted CF ──
+    section("Cash Flow Bridge")
+    st.markdown('<p style="font-size:0.75rem;color:#9AA0B0;margin-top:-0.5rem;margin-bottom:1rem;">How each cost layer erodes your cash flow year by year</p>', unsafe_allow_html=True)
+
+    fig_bridge = go.Figure()
+
+    noi_by_yr = [noi * (1 + noi_growth/100)**yr for yr in years_list]
+    lev_cf_by_yr = [n - annual_debt_service for n in noi_by_yr]
+    adj_cf_by_yr = [l - c for l, c in zip(lev_cf_by_yr, total_by_yr)]
+
+    fig_bridge.add_trace(go.Scatter(
+        name="NOI", x=years_list, y=noi_by_yr,
+        mode="lines+markers",
+        line=dict(color="#2ECC71", width=2),
+        marker=dict(size=5),
+        hovertemplate="Year %{x}<br>NOI: $%{y:,.0f}<extra></extra>"
+    ))
+    fig_bridge.add_trace(go.Scatter(
+        name="Levered Cash Flow", x=years_list, y=lev_cf_by_yr,
+        mode="lines+markers",
+        line=dict(color="#C9A84C", width=2),
+        marker=dict(size=5),
+        hovertemplate="Year %{x}<br>Levered CF: $%{y:,.0f}<extra></extra>"
+    ))
+    fig_bridge.add_trace(go.Scatter(
+        name="Adj. CF (after CapEx/TI/LC)", x=years_list, y=adj_cf_by_yr,
+        mode="lines+markers",
+        line=dict(color="#E74C3C", width=2, dash="dot"),
+        marker=dict(size=5),
+        hovertemplate="Year %{x}<br>Adj. CF: $%{y:,.0f}<extra></extra>"
+    ))
+
+    fig_bridge.update_layout(
+        **CHART_LAYOUT,
+        title=dict(text="NOI → Levered CF → Adjusted CF", font=dict(size=12, color="#E8E8E8")),
+        yaxis_tickprefix="$",
+        yaxis_tickformat=",.0f",
+        legend=dict(
+            font=dict(family="DM Sans", size=10, color="#9AA0B0"),
+            bgcolor="rgba(0,0,0,0)",
+            orientation="h",
+            yanchor="bottom", y=1.02,
+            xanchor="left",   x=0
+        )
+    )
+    st.plotly_chart(fig_bridge, use_container_width=True)
+
+    # ── Detailed year-by-year table ────────────
+    section("Detailed Capital Cost Schedule")
+
+    capex_table = pd.DataFrame({
+        "Year":              years_list,
+        "CapEx Reserve":     [f"${v:,.0f}" for v in capex_by_yr],
+        "Tenant Improvements": [f"${v:,.0f}" for v in ti_by_yr],
+        "Leasing Commissions": [f"${v:,.0f}" for v in lc_by_yr],
+        "Total Capital Cost":  [f"${v:,.0f}" for v in total_by_yr],
+        "Levered CF":          [f"${v:,.0f}" for v in lev_cf_by_yr],
+        "Adj. CF":             [f"${v:,.0f}" for v in adj_cf_by_yr],
+    })
+    st.dataframe(capex_table, use_container_width=True, hide_index=True)
