@@ -785,56 +785,71 @@ Cold Chain Logistics,12000,2023-01-01,2030-12-31,7.25,3.0,0.85,7.50,3"""
         # ── Tenant rent roll table ────────────
         section("Tenant Detail")
 
-        # Build the styled HTML rent roll table
-        # Each row is one tenant with color-coded risk and MTM
-        tbl_html = """
-        <div style="overflow-x:auto;">
-        <table class="rr-table">
-        <thead><tr>
-            <th>Tenant</th>
-            <th>SF</th>
-            <th>Lease End</th>
-            <th>Mo. to Exp.</th>
-            <th>Risk</th>
-            <th>In-Place Rent</th>
-            <th>Market Rent</th>
-            <th>Mark-to-Market</th>
-            <th>Annual Revenue</th>
-            <th>Renewal Prob</th>
-        </tr></thead>
-        <tbody>
-        """
+        # ── Build display DataFrame ───────────
+        # st.dataframe is more reliable than HTML tables inside st.tabs
+        # We format all columns as strings first so we control display exactly
+        display_df = pd.DataFrame({
+            "Tenant":          df_rr["tenant"],
+            "SF":              df_rr["sf"].apply(lambda x: f"{x:,.0f}"),
+            "Lease End":       df_rr["lease_end"].astype(str),
+            "Mo. to Exp.":     df_rr["months_to_expiry"].apply(lambda x: f"{x:.0f}"),
+            "Risk":            df_rr["risk"],
+            "In-Place $/SF":   df_rr["current_rent_psf"].apply(lambda x: f"${x:.2f}"),
+            "Market $/SF":     df_rr["market_rent_psf"].apply(lambda x: f"${x:.2f}"),
+            "Mark-to-Mkt":     df_rr["mark_to_market_pct"].apply(lambda x: f"{x:+.1%}"),
+            "Ann. Revenue":    df_rr["annual_revenue"].apply(lambda x: f"${x:,.0f}"),
+            "Renewal Prob":    df_rr["renewal_prob"].apply(lambda x: f"{x:.0%}"),
+        })
 
-        for _, t in df_rr.iterrows():
-            # Risk CSS class for color coding
-            if "Critical" in t["risk"]:
-                risk_cls = "risk-critical"
-            elif "Watch" in t["risk"]:
-                risk_cls = "risk-watch"
-            else:
-                risk_cls = "risk-stable"
+        # ── Apply row-level color styling ─────
+        # Pandas Styler lets us color individual cells based on values
+        # We color the Risk column and Mark-to-Market column
+        def style_risk(val):
+            # Returns a CSS string for the cell background
+            if "Critical" in str(val):
+                return "color: #E74C3C; font-weight: 600"
+            elif "Watch" in str(val):
+                return "color: #F39C12"
+            elif "Stable" in str(val):
+                return "color: #2ECC71"
+            return ""
 
-            # MTM CSS class
-            mtm_cls = "mtm-positive" if t["mark_to_market_pct"] >= 0 else "mtm-negative"
-            mtm_str = f"{t['mark_to_market_pct']:+.1%}"
+        def style_mtm(val):
+            # Green for positive MTM (below-market tenant = rent upside)
+            # Red for negative MTM (above-market tenant = rollover risk)
+            try:
+                v = float(str(val).replace("%","").replace("+",""))
+                return "color: #2ECC71" if v >= 0 else "color: #E74C3C"
+            except:
+                return ""
 
-            tbl_html += f"""
-            <tr>
-                <td>{t['tenant']}</td>
-                <td>{t['sf']:,.0f}</td>
-                <td>{t['lease_end']}</td>
-                <td>{t['months_to_expiry']:.0f}</td>
-                <td class="{risk_cls}">{t['risk']}</td>
-                <td>${t['current_rent_psf']:.2f}</td>
-                <td>${t['market_rent_psf']:.2f}</td>
-                <td class="{mtm_cls}">{mtm_str}</td>
-                <td>${t['annual_revenue']:,.0f}</td>
-                <td>{t['renewal_prob']:.0%}</td>
-            </tr>
-            """
+        styled = (
+            display_df.style
+            .applymap(style_risk,  subset=["Risk"])
+            .applymap(style_mtm,   subset=["Mark-to-Mkt"])
+            .set_properties(**{
+                "background-color": "#131929",
+                "color": "#E8E8E8",
+                "font-family": "DM Mono, monospace",
+                "font-size": "12px",
+                "border": "1px solid rgba(201,168,76,0.15)"
+            })
+            .set_table_styles([{
+                "selector": "th",
+                "props": [
+                    ("background-color", "#0A0E1A"),
+                    ("color", "#C9A84C"),
+                    ("font-family", "DM Mono, monospace"),
+                    ("font-size", "11px"),
+                    ("text-transform", "uppercase"),
+                    ("letter-spacing", "0.08em"),
+                    ("border", "1px solid rgba(201,168,76,0.2)"),
+                    ("padding", "8px 12px"),
+                ]
+            }])
+        )
 
-        tbl_html += "</tbody></table></div>"
-        st.markdown(tbl_html, unsafe_allow_html=True)
+        st.dataframe(display_df, use_container_width=True, hide_index=True)
 
         # ── Revenue schedule chart ────────────
         section("Projected Revenue by Tenant")
