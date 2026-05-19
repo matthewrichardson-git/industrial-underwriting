@@ -899,8 +899,8 @@ Cold Chain Logistics,12000,2023-01-01,2030-12-31,7.25,3.0,0.85,7.50,3"""
 
         styled = (
             display_df.style
-            .applymap(style_risk,  subset=["Risk"])
-            .applymap(style_mtm,   subset=["Mark-to-Mkt"])
+            .map(style_risk,  subset=["Risk"])
+            .map(style_mtm,   subset=["Mark-to-Mkt"])
             .set_properties(**{
                 "background-color": "#131929",
                 "color": "#E8E8E8",
