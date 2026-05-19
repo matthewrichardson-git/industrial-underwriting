@@ -1,0 +1,6 @@
+tenant,sf,lease_start,lease_end,rent_psf,annual_escalation_pct,renewal_prob,market_rent_psf,downtime_months
+Amazon Fulfillment,180000,2019-01-01,2026-06-30,5.50,2.0,0.80,6.25,3
+FedEx Ground,95000,2021-03-01,2028-03-01,6.25,2.5,0.75,6.50,4
+Regional Distributor,40000,2020-06-01,2025-12-31,4.75,0.0,0.55,5.75,6
+Midwest Auto Parts,28000,2022-09-01,2027-09-01,5.85,2.0,0.70,6.00,5
+Cold Chain Logistics,12000,2023-01-01,2030-12-31,7.25,3.0,0.85,7.50,3
