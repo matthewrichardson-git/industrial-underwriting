@@ -292,6 +292,14 @@ with st.sidebar:
     lc_pct             = st.number_input("Leasing Commission (%)", min_value=0.0, max_value=10.0, value=4.0, step=0.25)
     new_lease_term_yrs = st.number_input("New Lease Term (yrs)", min_value=1, max_value=20, value=5, step=1)
 
+    st.markdown('<div class="sidebar-section">LP / GP Waterfall</div>', unsafe_allow_html=True)
+    lp_equity_pct   = st.number_input("LP Equity (%)", min_value=50.0, max_value=99.0, value=90.0, step=5.0)
+    pref_return     = st.number_input("Preferred Return (%)", min_value=0.0, max_value=15.0, value=8.0, step=0.5)
+    promote_tier1   = st.number_input("Promote — Tier 1 (%)", min_value=0.0, max_value=50.0, value=20.0, step=5.0)
+    hurdle_tier1    = st.number_input("Hurdle — Tier 1 IRR (%)", min_value=0.0, max_value=30.0, value=12.0, step=0.5)
+    promote_tier2   = st.number_input("Promote — Tier 2 (%)", min_value=0.0, max_value=50.0, value=30.0, step=5.0)
+    hurdle_tier2    = st.number_input("Hurdle — Tier 2 IRR (%)", min_value=0.0, max_value=30.0, value=15.0, step=0.5)
+
 
 # ─────────────────────────────────────────────
 #  CORE CALCULATIONS (same as Session 2)
@@ -398,6 +406,171 @@ adj_cf = [-equity_invested] + [
     cf - cap for cf, cap in zip(annual_cash_flows, annual_capex_costs)
 ]
 irr_adj = npf.irr(adj_cf)
+
+# ─────────────────────────────────────────────
+#  LP / GP WATERFALL ENGINE
+#  Distributes total proceeds through the tiers
+#  in strict waterfall order. Returns per-tier
+#  and total LP/GP distributions.
+# ─────────────────────────────────────────────
+def build_waterfall(equity_invested, annual_cfs, sale_proceeds_val,
+                    lp_pct, pref_pct, promote_t1, hurdle_t1,
+                    promote_t2, hurdle_t2, hold_yrs):
+    """
+    Parameters
+    ----------
+    equity_invested   : total equity (LP + GP combined)
+    annual_cfs        : list of annual levered cash flows (before sale)
+    sale_proceeds_val : net sale proceeds at end of hold
+    lp_pct            : LP equity percentage (e.g. 0.90)
+    pref_pct          : preferred return rate (e.g. 0.08)
+    promote_t1        : GP promote in tier 1 (e.g. 0.20)
+    hurdle_t1         : IRR hurdle for tier 1 (e.g. 0.12)
+    promote_t2        : GP promote in tier 2 (e.g. 0.30)
+    hurdle_t2         : IRR hurdle for tier 2 (e.g. 0.15)
+    hold_yrs          : hold period in years
+
+    Returns
+    -------
+    dict with per-tier distributions and summary metrics
+    """
+    gp_pct = 1.0 - lp_pct
+
+    # Split equity contribution
+    lp_equity = equity_invested * lp_pct
+    gp_equity = equity_invested * gp_pct
+
+    # Total cash available to distribute = operating CFs + sale
+    # We combine everything into a single pool for waterfall math
+    # Operating CFs flow annually; sale at end
+    operating_cfs = annual_cfs[:-1]  # exclude last year (already has sale)
+    # Recalculate clean operating CFs (without sale proceeds)
+    clean_ops = [cf for cf in operating_cfs]
+    total_operating = sum(clean_ops)
+    total_pool = total_operating + sale_proceeds_val
+
+    # ── Accumulated pref owed to LP ────────────
+    # Simple interest on LP equity over hold period
+    # (Institutional LPAs often use compound — we use simple for clarity)
+    # pref_owed = LP equity x pref rate x years
+    pref_owed = lp_equity * pref_pct * hold_yrs
+
+    # ── Results dict — tracks each tier ────────
+    tiers = {
+        "lp_return_of_capital":  0.0,
+        "gp_return_of_capital":  0.0,
+        "lp_preferred_return":   0.0,
+        "gp_catchup":            0.0,
+        "lp_tier1_promote":      0.0,
+        "gp_tier1_promote":      0.0,
+        "lp_tier2_promote":      0.0,
+        "gp_tier2_promote":      0.0,
+    }
+
+    remaining = total_pool
+
+    # ── TIER 1: Return of Capital ───────────────
+    # LP and GP get their equity back pro-rata
+    roc = min(remaining, equity_invested)
+    tiers["lp_return_of_capital"] = roc * lp_pct
+    tiers["gp_return_of_capital"] = roc * gp_pct
+    remaining -= roc
+
+    # ── TIER 2: LP Preferred Return ─────────────
+    # 100% to LP until pref is satisfied
+    pref_dist = min(remaining, pref_owed)
+    tiers["lp_preferred_return"] = pref_dist
+    remaining -= pref_dist
+
+    # ── TIER 3: GP Catch-Up ─────────────────────
+    # GP gets distributions until they've received promote_t1 %
+    # of total profits distributed so far
+    # Total LP profit so far = pref_dist
+    # GP needs: (promote_t1 / (1 - promote_t1)) * lp_profit_so_far
+    lp_profit_so_far = pref_dist
+    if promote_t1 > 0 and remaining > 0:
+        catchup_needed = (promote_t1 / 100) / (1 - promote_t1 / 100) * lp_profit_so_far
+        catchup_dist = min(remaining, catchup_needed)
+        tiers["gp_catchup"] = catchup_dist
+        remaining -= catchup_dist
+
+    # ── TIER 4: Promote Tier 1 (up to hurdle_t1 IRR) ──
+    # Split remaining at (1-promote_t1) LP / promote_t1 GP
+    # until LP hits hurdle_t1 IRR on their equity
+    # Simplified: split all remaining at tier 1 ratio
+    # then check if we've exceeded hurdle_t1
+    if remaining > 0:
+        lp_share_t1 = (1 - promote_t1 / 100)
+        gp_share_t1 = promote_t1 / 100
+
+        # Estimate how much LP can receive before hitting hurdle_t1
+        # LP total return at hurdle_t1 = lp_equity * hurdle_t1 * hold_yrs (simple)
+        lp_target_t1 = lp_equity * (hurdle_t1 / 100) * hold_yrs
+        lp_still_needed_t1 = max(0, lp_target_t1 - pref_dist)
+
+        if lp_still_needed_t1 > 0:
+            # How much total to distribute so LP gets lp_still_needed_t1?
+            total_for_t1 = min(remaining, lp_still_needed_t1 / lp_share_t1)
+            tiers["lp_tier1_promote"] = total_for_t1 * lp_share_t1
+            tiers["gp_tier1_promote"] = total_for_t1 * gp_share_t1
+            remaining -= total_for_t1
+
+    # ── TIER 5: Promote Tier 2 (above hurdle_t2) ──
+    # Everything left splits at tier 2 ratio
+    if remaining > 0:
+        lp_share_t2 = (1 - promote_t2 / 100)
+        gp_share_t2 = promote_t2 / 100
+        tiers["lp_tier2_promote"] = remaining * lp_share_t2
+        tiers["gp_tier2_promote"] = remaining * gp_share_t2
+
+    # ── Summary ─────────────────────────────────
+    lp_total = (tiers["lp_return_of_capital"] + tiers["lp_preferred_return"] +
+                tiers["lp_tier1_promote"] + tiers["lp_tier2_promote"])
+    gp_total = (tiers["gp_return_of_capital"] + tiers["gp_catchup"] +
+                tiers["gp_tier1_promote"] + tiers["gp_tier2_promote"])
+
+    lp_profit = lp_total - lp_equity
+    gp_profit = gp_total - gp_equity
+    total_profit = lp_profit + gp_profit
+
+    # GP promote = GP profit as % of total profit
+    gp_promote_pct = gp_profit / total_profit if total_profit > 0 else 0
+
+    # Equity multiples
+    lp_em = lp_total / lp_equity if lp_equity > 0 else 0
+    gp_em = gp_total / gp_equity if gp_equity > 0 else 0
+
+    return {
+        "tiers":          tiers,
+        "lp_equity":      lp_equity,
+        "gp_equity":      gp_equity,
+        "lp_total":       lp_total,
+        "gp_total":       gp_total,
+        "lp_profit":      lp_profit,
+        "gp_profit":      gp_profit,
+        "lp_em":          lp_em,
+        "gp_em":          gp_em,
+        "gp_promote_pct": gp_promote_pct,
+        "pref_owed":      pref_owed,
+        "pref_paid":      tiers["lp_preferred_return"],
+        "pref_satisfied": tiers["lp_preferred_return"] >= pref_owed * 0.99,
+        "total_pool":     total_pool,
+    }
+
+# Run waterfall with current inputs
+# Use the operating cash flows (exclude sale, which we pass separately)
+wf = build_waterfall(
+    equity_invested   = equity_invested,
+    annual_cfs        = annual_cash_flows,
+    sale_proceeds_val = sale_proceeds,
+    lp_pct            = lp_equity_pct / 100,
+    pref_pct          = pref_return / 100,
+    promote_t1        = promote_tier1,
+    hurdle_t1         = hurdle_tier1,
+    promote_t2        = promote_tier2,
+    hurdle_t2         = hurdle_tier2,
+    hold_yrs          = hold_years,
+)
 
 dscr_pass = dscr >= 1.25
 coc_pass  = cash_on_cash >= 0.07
@@ -601,7 +774,7 @@ st.markdown(f"""
 # ─────────────────────────────────────────────
 #  TABS — Pro Forma | Rent Roll
 # ─────────────────────────────────────────────
-tab1, tab2, tab3 = st.tabs(["Pro Forma", "Rent Roll", "CapEx & Returns"])
+tab1, tab2, tab3, tab4 = st.tabs(["Pro Forma", "Rent Roll", "CapEx & Returns", "LP/GP Waterfall"])
 
 
 # ═════════════════════════════════════════════
@@ -1213,3 +1386,235 @@ with tab3:
         "Adj. CF":             [f"${v:,.0f}" for v in adj_cf_by_yr],
     })
     st.dataframe(capex_table, use_container_width=True, hide_index=True)
+
+
+# ═════════════════════════════════════════════
+#  TAB 4 — LP / GP WATERFALL
+# ═════════════════════════════════════════════
+with tab4:
+
+    section("Partnership Structure")
+
+    # ── Equity split summary ───────────────────
+    gp_equity_pct = 100 - lp_equity_pct
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        metric_card("LP Equity", f"${wf['lp_equity']:,.0f}",
+                    f"{lp_equity_pct:.0f}% of total equity")
+    with c2:
+        metric_card("GP Equity", f"${wf['gp_equity']:,.0f}",
+                    f"{gp_equity_pct:.0f}% of total equity")
+    with c3:
+        metric_card("Preferred Return",
+                    f"{pref_return:.1f}%",
+                    f"${wf['pref_owed']:,.0f} owed to LP")
+    with c4:
+        pref_color = "metric-pass" if wf["pref_satisfied"] else "metric-fail"
+        metric_card("Pref Satisfied?",
+                    "✓ Yes" if wf["pref_satisfied"] else "✗ No",
+                    f"${wf['pref_paid']:,.0f} paid of ${wf['pref_owed']:,.0f}",
+                    pref_color)
+
+    # ── Returns comparison ─────────────────────
+    section("LP vs GP Returns")
+
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        metric_card("LP Total Distributions", f"${wf['lp_total']:,.0f}",
+                    f"{wf['lp_em']:.2f}x equity multiple")
+    with c2:
+        metric_card("GP Total Distributions", f"${wf['gp_total']:,.0f}",
+                    f"{wf['gp_em']:.2f}x equity multiple")
+    with c3:
+        metric_card("LP Profit", f"${wf['lp_profit']:,.0f}",
+                    f"Above return of capital")
+    with c4:
+        metric_card("GP Promote Earned",
+                    f"{wf['gp_promote_pct']:.1%}",
+                    f"${wf['gp_profit']:,.0f} GP profit on {gp_equity_pct:.0f}% equity",
+                    "metric-pass")
+
+    # ── Waterfall tier breakdown table ─────────
+    section("Waterfall Distribution by Tier")
+
+    t = wf["tiers"]
+    tier_data = {
+        "Tier": [
+            "1 — Return of Capital",
+            "1 — Return of Capital",
+            "2 — Preferred Return (8%)",
+            "3 — GP Catch-Up",
+            "4 — Promote Tier 1",
+            "4 — Promote Tier 1",
+            "5 — Promote Tier 2",
+            "5 — Promote Tier 2",
+        ],
+        "Recipient": ["LP", "GP", "LP", "GP", "LP", "GP", "LP", "GP"],
+        "Amount": [
+            t["lp_return_of_capital"],
+            t["gp_return_of_capital"],
+            t["lp_preferred_return"],
+            t["gp_catchup"],
+            t["lp_tier1_promote"],
+            t["gp_tier1_promote"],
+            t["lp_tier2_promote"],
+            t["gp_tier2_promote"],
+        ]
+    }
+
+    df_tiers = pd.DataFrame(tier_data)
+    df_tiers["Amount"] = df_tiers["Amount"].apply(lambda x: f"${x:,.0f}")
+    df_tiers["% of Pool"] = [
+        wf["tiers"][k] / wf["total_pool"] * 100
+        for k in [
+            "lp_return_of_capital", "gp_return_of_capital",
+            "lp_preferred_return", "gp_catchup",
+            "lp_tier1_promote", "gp_tier1_promote",
+            "lp_tier2_promote", "gp_tier2_promote",
+        ]
+    ]
+    df_tiers["% of Pool"] = df_tiers["% of Pool"].apply(lambda x: f"{x:.1f}%")
+
+    def color_recipient(val):
+        if val == "LP":
+            return "color: #4C9AC9"
+        elif val == "GP":
+            return "color: #C9A84C"
+        return ""
+
+    styled_tiers = (
+        df_tiers.style
+        .map(color_recipient, subset=["Recipient"])
+        .set_properties(**{
+            "background-color": "#131929",
+            "color": "#E8E8E8",
+            "font-family": "DM Mono, monospace",
+            "font-size": "12px",
+        })
+        .set_table_styles([{
+            "selector": "th",
+            "props": [
+                ("background-color", "#0A0E1A"),
+                ("color", "#C9A84C"),
+                ("font-family", "DM Mono, monospace"),
+                ("font-size", "11px"),
+                ("text-transform", "uppercase"),
+                ("letter-spacing", "0.08em"),
+                ("padding", "8px 12px"),
+            ]
+        }])
+    )
+    st.dataframe(df_tiers, use_container_width=True, hide_index=True)
+
+    # ── Waterfall bar chart ────────────────────
+    section("Waterfall Visualization")
+
+    CHART_LAYOUT_WF = dict(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="#131929",
+        font=dict(family="DM Sans", color="#9AA0B0", size=11),
+        margin=dict(l=50, r=20, t=40, b=80),
+        xaxis=dict(
+            gridcolor="rgba(255,255,255,0.05)",
+            tickfont=dict(family="DM Mono", size=9),
+            tickangle=-20,
+        ),
+        yaxis=dict(
+            gridcolor="rgba(255,255,255,0.05)",
+            tickfont=dict(family="DM Mono", size=10),
+        )
+    )
+
+    # Grouped bar: LP vs GP at each tier
+    tier_labels = [
+        "Return of\nCapital",
+        "Preferred\nReturn",
+        "GP\nCatch-Up",
+        "Promote\nTier 1",
+        "Promote\nTier 2",
+    ]
+    lp_amounts = [
+        t["lp_return_of_capital"],
+        t["lp_preferred_return"],
+        0,
+        t["lp_tier1_promote"],
+        t["lp_tier2_promote"],
+    ]
+    gp_amounts = [
+        t["gp_return_of_capital"],
+        0,
+        t["gp_catchup"],
+        t["gp_tier1_promote"],
+        t["gp_tier2_promote"],
+    ]
+
+    fig_wf = go.Figure()
+    fig_wf.add_trace(go.Bar(
+        name="LP Distribution",
+        x=tier_labels, y=lp_amounts,
+        marker_color="#4C9AC9",
+        marker_line_width=0,
+        hovertemplate="%{x}<br>LP: $%{y:,.0f}<extra></extra>"
+    ))
+    fig_wf.add_trace(go.Bar(
+        name="GP Distribution",
+        x=tier_labels, y=gp_amounts,
+        marker_color="#C9A84C",
+        marker_line_width=0,
+        hovertemplate="%{x}<br>GP: $%{y:,.0f}<extra></extra>"
+    ))
+    fig_wf.update_layout(
+        **CHART_LAYOUT_WF,
+        title=dict(text="LP vs GP Distribution by Waterfall Tier",
+                   font=dict(size=12, color="#E8E8E8")),
+        barmode="group",
+        yaxis_tickprefix="$",
+        yaxis_tickformat=",.0f",
+        legend=dict(
+            font=dict(family="DM Sans", size=10, color="#9AA0B0"),
+            bgcolor="rgba(0,0,0,0)",
+            orientation="h",
+            yanchor="bottom", y=1.02,
+            xanchor="left", x=0
+        ),
+        bargap=0.25,
+        bargroupgap=0.05
+    )
+    st.plotly_chart(fig_wf, use_container_width=True)
+
+    # ── LP vs GP profit pie chart ──────────────
+    col_pie, col_em = st.columns([1, 1])
+
+    with col_pie:
+        fig_pie = go.Figure(go.Pie(
+            labels=["LP Profit", "GP Promote"],
+            values=[wf["lp_profit"], wf["gp_profit"]],
+            hole=0.55,
+            marker=dict(colors=["#4C9AC9", "#C9A84C"],
+                        line=dict(color="#0A0E1A", width=2)),
+            textfont=dict(family="DM Mono", size=11),
+            hovertemplate="%{label}<br>$%{value:,.0f}<br>%{percent}<extra></extra>"
+        ))
+        fig_pie.update_layout(
+            paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(family="DM Sans", color="#9AA0B0"),
+            margin=dict(l=20, r=20, t=40, b=20),
+            title=dict(text="Profit Split", font=dict(size=12, color="#E8E8E8")),
+            legend=dict(font=dict(family="DM Sans", size=10, color="#9AA0B0"),
+                        bgcolor="rgba(0,0,0,0)")
+        )
+        st.plotly_chart(fig_pie, use_container_width=True)
+
+    with col_em:
+        st.markdown("<div style='height:2rem'></div>", unsafe_allow_html=True)
+        metric_card("LP Equity Multiple", f"{wf['lp_em']:.2f}x",
+                    f"On ${wf['lp_equity']:,.0f} invested")
+        st.markdown("<div style='height:0.75rem'></div>", unsafe_allow_html=True)
+        metric_card("GP Equity Multiple", f"{wf['gp_em']:.2f}x",
+                    f"On ${wf['gp_equity']:,.0f} invested — promote effect",
+                    "metric-pass")
+        st.markdown("<div style='height:0.75rem'></div>", unsafe_allow_html=True)
+        metric_card("GP Effective Ownership",
+                    f"{wf['gp_promote_pct']:.1%}",
+                    f"Of total profits vs {gp_equity_pct:.0f}% equity contribution",
+                    "metric-pass")
