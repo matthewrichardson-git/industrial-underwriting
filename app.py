@@ -265,7 +265,8 @@ with st.sidebar:
 
     st.markdown('<div class="sidebar-section">Income</div>', unsafe_allow_html=True)
     rent_psf      = st.number_input("Base Rent ($/SF/yr)", min_value=0.0, value=6.50, step=0.25)
-    occupancy     = st.slider("Occupancy", min_value=0.0, max_value=1.0, value=0.95, step=0.01, format="%.0f%%")
+    occupancy_pct  = st.slider("Occupancy (%)", min_value=0, max_value=100, value=95, step=1)
+    occupancy      = occupancy_pct / 100
     other_income  = st.number_input("Other Income ($/yr)", min_value=0.0, value=0.0, step=500.0)
 
     st.markdown('<div class="sidebar-section">Expenses</div>', unsafe_allow_html=True)
@@ -708,36 +709,36 @@ def build_excel_export(
     wb.remove(wb.active)  # remove default sheet
 
     # ── Style constants ──────────────────────
-    NAVY    = "0A0E1A"
-    NAVY2   = "131929"
-    NAVY3   = "1C2333"
-    GOLD    = "C9A84C"
-    WHITE   = "E8E8E8"
-    GREEN   = "2ECC71"
-    RED     = "E74C3C"
-    AMBER   = "F39C12"
+    NAVY    = "1B2A4A"
+    NAVY2   = "FFFFFF"
+    NAVY3   = "F7F9FC"
+    GOLD    = "1B2A4A"
+    WHITE   = "1A1A2E"
+    GREEN   = "1A7A4A"
+    RED     = "C0392B"
+    AMBER   = "B7770D"
 
     def hdr_fill(hex_color):
         return PatternFill("solid", fgColor=hex_color)
 
-    def hdr_font(hex_color=WHITE, bold=True, size=10):
+    def hdr_font(hex_color="1B2A4A", bold=True, size=10):
         return Font(name="Calibri", color=hex_color, bold=bold, size=size)
 
     def num_font(size=10):
-        return Font(name="Calibri", color=WHITE, size=size)
+        return Font(name="Calibri", color="1A1A2E", size=size)
 
     def thin_border():
-        s = Side(style="thin", color="1C2333")
+        s = Side(style="thin", color="D0D8E4")
         return Border(left=s, right=s, top=s, bottom=s)
 
     def set_col_width(ws, col, width):
         ws.column_dimensions[get_column_letter(col)].width = width
 
-    def write_header_row(ws, row, cols, fill_color=NAVY2):
+    def write_header_row(ws, row, cols, fill_color="D6E4F0"):
         for c, (text, width) in enumerate(cols, 1):
             cell = ws.cell(row=row, column=c, value=text)
             cell.fill    = hdr_fill(fill_color)
-            cell.font    = hdr_font(GOLD)
+            cell.font    = Font(name="Calibri", color="1B2A4A", bold=True, size=10)
             cell.alignment = Alignment(horizontal="center", vertical="center")
             cell.border  = thin_border()
             set_col_width(ws, c, width)
@@ -745,8 +746,8 @@ def build_excel_export(
     def write_data_row(ws, row, values, fmt=None, bold=False, color=WHITE):
         for c, val in enumerate(values, 1):
             cell = ws.cell(row=row, column=c, value=val)
-            cell.fill   = hdr_fill(NAVY2 if row % 2 == 0 else NAVY3)
-            cell.font   = Font(name="Calibri", color=color,
+            cell.fill   = hdr_fill("FFFFFF" if row % 2 == 0 else "F7F9FC")
+            cell.font   = Font(name="Calibri", color="1A1A2E",
                                bold=bold, size=10)
             cell.border = thin_border()
             cell.alignment = Alignment(horizontal="right" if c > 1 else "left",
@@ -845,10 +846,12 @@ def build_excel_export(
         ws1.cell(row=row, column=1).alignment = Alignment(horizontal="left")
         for c, v in enumerate([val, thresh, status], 2):
             cell = ws1.cell(row=row, column=c, value=v)
-            cell.fill   = hdr_fill(NAVY2 if row%2==0 else NAVY3)
+            is_key = label in ("DSCR", "IRR (Unadjusted)", "IRR (After CapEx/TI/LC)", "Cash-on-Cash Return")
+            bg = "EBF5FB" if is_key else ("FFFFFF" if row%2==0 else "F7F9FC")
+            cell.fill   = hdr_fill(bg)
             cell.font   = Font(name="Calibri",
-                               color=cell_color if c==4 else WHITE,
-                               size=10, bold=(c==4))
+                               color=cell_color if c==4 else "1A1A2E",
+                               size=10, bold=(c==4 or is_key))
             cell.border = thin_border()
             cell.alignment = Alignment(horizontal="right" if c>1 else "left")
             if isinstance(v, float) and v > 100:
@@ -1032,7 +1035,50 @@ def build_excel_export(
             cell.number_format = "#,##0"
 
     # ════════════════════════════════════════
-    #  SHEET 5 — RENT ROLL (if uploaded)
+    #  SHEET 5 — 10-YEAR CASH FLOW
+    # ════════════════════════════════════════
+    ws_cf = wb.create_sheet("10-Year Pro Forma")
+    ws_cf.sheet_view.showGridLines = False
+    ws_cf.sheet_properties.tabColor = "4C9AC9"
+    ws_cf.merge_cells("A1:H1")
+    t_cf = ws_cf["A1"]
+    t_cf.value = "10-YEAR CASH FLOW PROJECTION"
+    t_cf.fill  = hdr_fill("1B2A4A")
+    t_cf.font  = Font(name="Calibri", color="FFFFFF", bold=True, size=13)
+    t_cf.alignment = Alignment(horizontal="left", vertical="center")
+    ws_cf.row_dimensions[1].height = 28
+    row = 3
+    write_header_row(ws_cf, row, [
+        ("Year",8),("NOI",16),("NOI/SF",10),
+        ("Debt Service",16),("Levered CF",16),
+        ("CapEx/TI/LC",16),("Adj. CF",16),("Cum. Adj. CF",16)
+    ])
+    _noi_l = [noi*(1+noi_growth/100)**yr for yr in range(1,int(hold_years)+1)]
+    _lev_l = [n - annual_debt_service for n in _noi_l]
+    _cap_l = [capex_summary["annual_totals"][yr] for yr in range(1,int(hold_years)+1)]
+    _adj_l = [l - c for l,c in zip(_lev_l,_cap_l)]
+    _cum = 0
+    for i,yr in enumerate(range(1,int(hold_years)+1)):
+        row += 1
+        _cum += _adj_l[i]
+        is_last = (i == int(hold_years)-1)
+        bg = "EBF5FB" if is_last else ("FFFFFF" if row%2==0 else "F7F9FC")
+        vals = [yr, _noi_l[i], _noi_l[i]/square_feet, annual_debt_service,
+                _lev_l[i]+(sale_proceeds if is_last else 0),
+                _cap_l[i], _adj_l[i]+(sale_proceeds if is_last else 0),
+                _cum+(sale_proceeds if is_last else 0)]
+        fmts = ["General","#,##0","#,##0.00","#,##0","#,##0","#,##0","#,##0","#,##0"]
+        for c,(v,f) in enumerate(zip(vals,fmts),1):
+            cell = ws_cf.cell(row=row, column=c, value=v)
+            cell.fill = hdr_fill(bg)
+            cell.font = Font(name="Calibri", color="1A1A2E", bold=is_last, size=10)
+            cell.border = thin_border()
+            cell.number_format = f
+            cell.alignment = Alignment(
+                horizontal="right" if c>1 else "center", vertical="center")
+
+    # ════════════════════════════════════════
+    #  SHEET 6 — RENT ROLL (if uploaded)
     # ════════════════════════════════════════
     if rent_roll_df is not None:
         ws5 = wb.create_sheet("Rent Roll")
@@ -1491,6 +1537,40 @@ with tab1:
         tbl += f"<tr><td>{idx}</td>{cells}</tr>"
     tbl += "</tbody></table></div>"
     st.markdown(tbl, unsafe_allow_html=True)
+
+    # ── 10-Year Cash Flow Projection ──────────
+    section("10-Year Cash Flow Projection")
+    st.markdown('<p style="font-size:0.75rem;color:#9AA0B0;margin-top:-0.5rem;margin-bottom:1rem;">Year-by-year pro forma including debt service and capital costs</p>', unsafe_allow_html=True)
+
+    cf_years     = list(range(1, int(hold_years)+1))
+    cf_noi       = [noi * (1 + noi_growth/100)**yr for yr in cf_years]
+    cf_ds        = [annual_debt_service] * len(cf_years)
+    cf_lev       = [n - annual_debt_service for n in cf_noi]
+    cf_capex     = [capex_summary["annual_totals"][yr] for yr in cf_years]
+    cf_adj       = [l - c for l, c in zip(cf_lev, cf_capex)]
+    cf_noi_psf   = [n / square_feet for n in cf_noi]
+
+    # Add sale proceeds to final year
+    cf_lev_disp  = cf_lev.copy()
+    cf_adj_disp  = cf_adj.copy()
+    cf_lev_disp[-1] += sale_proceeds
+    cf_adj_disp[-1] += sale_proceeds
+
+    cf_df = pd.DataFrame({
+        "Year":           cf_years,
+        "NOI":            [f"${v:,.0f}" for v in cf_noi],
+        "NOI / SF":       [f"${v:.2f}"  for v in cf_noi_psf],
+        "Debt Service":   [f"(${v:,.0f})" for v in cf_ds],
+        "Levered CF":     [f"${v:,.0f}" for v in cf_lev],
+        "CapEx / TI / LC":[f"(${v:,.0f})" for v in cf_capex],
+        "Adj. CF":        [f"${v:,.0f}" for v in cf_adj],
+        "Cum. Adj. CF":   [f"${sum(cf_adj[:i+1]):,.0f}" for i in range(len(cf_adj))],
+    })
+    # Mark final year
+    cf_df.loc[cf_df.index[-1], "Levered CF"] += " + Sale"
+    cf_df.loc[cf_df.index[-1], "Adj. CF"]   += " + Sale"
+
+    st.dataframe(cf_df, use_container_width=True, hide_index=True)
 
     st.markdown('<div class="gold-divider"></div>', unsafe_allow_html=True)
     section("Deal Verdict")
