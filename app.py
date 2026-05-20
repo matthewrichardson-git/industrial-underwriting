@@ -20,45 +20,49 @@ st.set_page_config(
 # ─────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 :root {
-    --navy:      #0A0E1A;
-    --navy2:     #131929;
-    --navy3:     #1C2333;
-    --gold:      #C9A84C;
-    --gold-dim:  #9A7A38;
-    --white:     #E8E8E8;
-    --white-dim: #9AA0B0;
-    --green:     #2ECC71;
-    --red:       #E74C3C;
-    --amber:     #F39C12;
-    --border:    rgba(201,168,76,0.2);
+    --bg:        #F5F5F7;
+    --surface:   #FFFFFF;
+    --surface2:  #F5F5F7;
+    --border:    #D2D2D7;
+    --border2:   #E8E8ED;
+    --navy:      #1D1D1F;
+    --navy2:     #3A3A3C;
+    --mid:       #6E6E73;
+    --blue:      #0071E3;
+    --blue-dim:  #EBF3FD;
+    --green:     #1A7A4A;
+    --green-dim: #EAFAF1;
+    --red:       #C0392B;
+    --red-dim:   #FDEDEC;
+    --amber:     #9A6700;
+    --amber-dim: #FEF9E7;
 }
 
 html, body, [class*="css"] {
-    font-family: 'DM Sans', sans-serif;
-    background-color: var(--navy);
-    color: var(--white);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background-color: var(--bg);
+    color: var(--navy);
+    -webkit-font-smoothing: antialiased;
 }
-
 #MainMenu, footer, header { visibility: hidden; }
 .block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
 
 [data-testid="stSidebar"] {
-    background-color: var(--navy2);
+    background-color: var(--surface);
     border-right: 1px solid var(--border);
 }
-
 .sidebar-section {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.65rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
     font-weight: 500;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: var(--gold);
+    color: var(--mid);
     padding: 1rem 0 0.4rem 0;
-    border-top: 1px solid var(--border);
+    border-top: 1px solid var(--border2);
     margin-top: 0.5rem;
 }
 .sidebar-section:first-child { border-top: none; margin-top: 0; }
@@ -67,169 +71,143 @@ html, body, [class*="css"] {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    padding: 0.5rem 0 1.5rem 0;
+    padding: 0.25rem 0 1.25rem 0;
     border-bottom: 1px solid var(--border);
     margin-bottom: 1.5rem;
 }
 .page-header-left h1 {
-    font-size: 1.4rem;
-    font-weight: 600;
-    color: var(--white);
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: var(--navy);
     margin: 0 0 0.2rem 0;
-    letter-spacing: -0.01em;
+    letter-spacing: -0.02em;
 }
 .page-header-left p {
-    font-size: 0.78rem;
-    color: var(--white-dim);
+    font-size: 0.75rem;
+    color: var(--mid);
     margin: 0;
-    font-family: 'DM Mono', monospace;
+    font-family: 'IBM Plex Mono', monospace;
 }
 .status-badge {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.65rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.62rem;
     font-weight: 500;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    padding: 0.3rem 0.75rem;
-    border-radius: 2px;
-    margin-top: 0.25rem;
+    padding: 0.3rem 0.85rem;
+    border-radius: 20px;
+    display: inline-block;
 }
-.badge-pass   { background: rgba(46,204,113,0.15); color: var(--green); border: 1px solid rgba(46,204,113,0.3); }
-.badge-fail   { background: rgba(231,76,60,0.15);  color: var(--red);   border: 1px solid rgba(231,76,60,0.3); }
-.badge-review { background: rgba(243,156,18,0.15); color: var(--amber); border: 1px solid rgba(243,156,18,0.3); }
+.badge-pass   { background: var(--green-dim); color: var(--green); border: 1px solid rgba(26,122,74,0.25); }
+.badge-fail   { background: var(--red-dim);   color: var(--red);   border: 1px solid rgba(192,57,43,0.25); }
+.badge-review { background: var(--amber-dim); color: var(--amber); border: 1px solid rgba(154,103,0,0.25); }
 
 .section-header {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.65rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
     font-weight: 500;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: var(--gold);
+    color: var(--mid);
     padding-bottom: 0.5rem;
-    border-bottom: 1px solid var(--border);
-    margin: 1.5rem 0 1rem 0;
+    border-bottom: 1px solid var(--border2);
+    margin: 1.75rem 0 1rem 0;
 }
 
 .metric-card {
-    background: var(--navy2);
+    background: var(--surface);
     border: 1px solid var(--border);
-    border-top: 2px solid var(--gold);
+    border-top: 2px solid var(--blue);
     padding: 1rem 1.25rem;
-    border-radius: 2px;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
 }
 .metric-label {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.62rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.58rem;
     letter-spacing: 0.1em;
     text-transform: uppercase;
-    color: var(--white-dim);
+    color: var(--mid);
     margin-bottom: 0.4rem;
 }
 .metric-value {
-    font-size: 1.6rem;
-    font-weight: 600;
-    color: var(--white);
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--navy);
     line-height: 1;
     margin-bottom: 0.3rem;
     letter-spacing: -0.02em;
 }
-.metric-sub { font-family: 'DM Mono', monospace; font-size: 0.65rem; color: var(--white-dim); }
+.metric-sub { font-family: 'IBM Plex Mono', monospace; font-size: 0.62rem; color: var(--mid); }
 .metric-pass { color: var(--green) !important; }
 .metric-fail { color: var(--red)   !important; }
 .metric-warn { color: var(--amber) !important; }
 
-/* ── Rent roll table ── */
-.rr-table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 0.78rem;
+.noi-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.45rem 0;
+    border-bottom: 1px solid var(--border2);
+    font-size: 0.82rem;
 }
-.rr-table th {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.58rem;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: var(--gold);
-    padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid var(--border);
-    text-align: right;
-    white-space: nowrap;
+.noi-row:last-child {
+    border-bottom: none;
+    font-weight: 700;
+    color: var(--blue);
+    padding-top: 0.6rem;
+    margin-top: 0.25rem;
+    border-top: 2px solid var(--border);
 }
-.rr-table th:first-child { text-align: left; }
-.rr-table td {
-    padding: 0.5rem 0.75rem;
-    border-bottom: 1px solid rgba(255,255,255,0.04);
-    color: var(--white);
-    text-align: right;
-    font-family: 'DM Mono', monospace;
-    font-size: 0.72rem;
-}
-.rr-table td:first-child {
-    text-align: left;
-    font-family: 'DM Sans', sans-serif;
-    font-size: 0.8rem;
-    font-weight: 500;
-    color: var(--white);
-}
-.rr-table tr:hover td { background: rgba(201,168,76,0.04); }
-.risk-critical { color: #E74C3C; font-weight: 600; }
-.risk-watch    { color: #F39C12; }
-.risk-stable   { color: #2ECC71; }
-.mtm-positive  { color: #2ECC71; }
-.mtm-negative  { color: #E74C3C; }
-
-.noi-row { display: flex; justify-content: space-between; padding: 0.4rem 0; border-bottom: 1px solid rgba(255,255,255,0.05); font-size: 0.82rem; }
-.noi-row:last-child { border-bottom: none; font-weight: 600; color: var(--gold); }
-.noi-label { color: var(--white-dim); }
-.noi-value { font-family: 'DM Mono', monospace; color: var(--white); }
+.noi-label { color: var(--navy2); }
+.noi-value { font-family: 'IBM Plex Mono', monospace; color: var(--navy); }
 .noi-negative { color: var(--red) !important; }
 
-[data-testid="stExpander"] {
-    background: var(--navy2);
-    border: 1px solid var(--border) !important;
-    border-radius: 2px;
-}
-
-/* ── Tabs ── */
 [data-testid="stTabs"] [data-baseweb="tab-list"] {
     background: transparent;
     border-bottom: 1px solid var(--border);
-    gap: 0;
 }
 [data-testid="stTabs"] [data-baseweb="tab"] {
-    font-family: 'DM Mono', monospace;
-    font-size: 0.65rem;
-    letter-spacing: 0.1em;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    color: var(--white-dim);
+    color: var(--mid);
     background: transparent;
     border: none;
-    padding: 0.6rem 1.25rem;
+    padding: 0.65rem 1.25rem;
 }
 [data-testid="stTabs"] [aria-selected="true"] {
-    color: var(--gold) !important;
-    border-bottom: 2px solid var(--gold) !important;
+    color: var(--blue) !important;
+    border-bottom: 2px solid var(--blue) !important;
     background: transparent !important;
 }
 
-.gold-divider {
-    height: 1px;
-    background: linear-gradient(90deg, var(--gold) 0%, transparent 100%);
-    margin: 1.5rem 0;
-    opacity: 0.4;
+[data-testid="stExpander"] {
+    background: var(--surface);
+    border: 1px solid var(--border) !important;
+    border-radius: 8px;
 }
 
-/* ── Walt bar ── */
-.walt-bar-bg {
-    background: var(--navy3);
-    border-radius: 2px;
-    height: 6px;
-    margin-top: 0.4rem;
+[data-testid="stDownloadButton"] button {
+    background: var(--blue) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 8px !important;
+    font-family: 'Inter', sans-serif !important;
+    font-size: 0.82rem !important;
+    font-weight: 500 !important;
 }
-.walt-bar-fill {
-    background: var(--gold);
-    border-radius: 2px;
-    height: 6px;
+
+.walt-bar-bg  { background: var(--border2); border-radius: 4px; height: 6px; margin-top: 0.4rem; }
+.walt-bar-fill { border-radius: 4px; height: 6px; }
+.gold-divider  { height: 1px; background: var(--border); margin: 1.75rem 0; }
+
+[data-testid="stNumberInput"] input,
+[data-testid="stTextInput"] input {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--navy);
+    border-radius: 6px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -669,9 +647,9 @@ s_base = run_scenario(**base_args)
 s_bull = run_scenario(**bull_args)
 
 scenarios = {
-    "🐻 Bear": s_bear,
-    "📊 Base": s_base,
-    "🐂 Bull": s_bull,
+    "Bear": s_bear,
+    "Base": s_base,
+    "Bull": s_bull,
 }
 
 # ─────────────────────────────────────────────
@@ -874,7 +852,7 @@ def build_excel_export(
 
     row = 3
     write_header_row(ws2, row,
-        [("Metric",28),("🐻 Bear",18),("📊 Base",18),("🐂 Bull",18)], NAVY)
+        [("Metric",28),("Bear",18),("Base",18),("Bull",18)], NAVY)
 
     scenario_rows = [
         ("Occupancy",          f"{bear_args['occupancy_s']:.0%}",   f"{base_args['occupancy_s']:.0%}",   f"{bull_args['occupancy_s']:.0%}"),
@@ -1425,7 +1403,7 @@ with tab1:
             ("Total Expenses",         f"(${total_expenses:,.0f})",          True),
             ("Net Operating Income",   f"${noi:>12,.0f}",                    False),
         ]
-        html = '<div style="background:var(--navy2);border:1px solid var(--border);padding:1rem 1.25rem;border-radius:2px;">'
+        html = '<div style="background:var(--surface);border:1px solid var(--border);padding:1rem 1.25rem;border-radius:2px;">'
         for label, val, is_neg in items:
             cls = "noi-negative" if is_neg else ""
             divider = 'border-top:1px solid var(--border);margin-top:0.4rem;padding-top:0.6rem;' if label in ("Effective Gross Income","Total Expenses","Net Operating Income") else ""
@@ -1469,21 +1447,21 @@ with tab1:
 
     CHART_LAYOUT = dict(
         paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="#131929",
-        font=dict(family="DM Sans", color="#9AA0B0", size=11),
+        plot_bgcolor="#FFFFFF",
+        font=dict(family="Inter", color="#6E6E73", size=11),
         margin=dict(l=50, r=20, t=40, b=40),
-        xaxis=dict(gridcolor="rgba(255,255,255,0.05)", zerolinecolor="rgba(255,255,255,0.1)", tickfont=dict(family="DM Mono", size=10)),
-        yaxis=dict(gridcolor="rgba(255,255,255,0.05)", zerolinecolor="rgba(255,255,255,0.1)", tickfont=dict(family="DM Mono", size=10))
+        xaxis=dict(gridcolor="#E8E8ED", zerolinecolor="#D2D2D7", tickfont=dict(family="IBM Plex Mono", size=10)),
+        yaxis=dict(gridcolor="#E8E8ED", zerolinecolor="#D2D2D7", tickfont=dict(family="IBM Plex Mono", size=10))
     )
 
     with col_chart1:
         years       = list(range(1, int(hold_years)+1))
         noi_by_year = [noi * (1 + noi_growth/100)**yr for yr in years]
         fig1 = go.Figure()
-        fig1.add_trace(go.Bar(x=years, y=noi_by_year, marker_color="#C9A84C",
+        fig1.add_trace(go.Bar(x=years, y=noi_by_year, marker_color="#0071E3",
             marker_line_width=0, hovertemplate="Year %{x}<br>NOI: $%{y:,.0f}<extra></extra>"))
         fig1.update_layout(**CHART_LAYOUT,
-            title=dict(text="Projected NOI — Hold Period", font=dict(size=12, color="#E8E8E8")),
+            title=dict(text="Projected NOI — Hold Period", font=dict(size=12, color="#1D1D1F")),
             yaxis_tickprefix="$", yaxis_tickformat=",.0f", bargap=0.25)
         st.plotly_chart(fig1, use_container_width=True)
 
@@ -1495,13 +1473,13 @@ with tab1:
             x=["Equity In","Operating CF","Sale Proceeds","Total Return"],
             y=[-equity_invested, total_cf, appreciation, None],
             connector=dict(line=dict(color="rgba(201,168,76,0.3)", width=1, dash="dot")),
-            decreasing=dict(marker_color="#E74C3C"),
-            increasing=dict(marker_color="#C9A84C"),
-            totals=dict(marker_color="#2ECC71"),
+            decreasing=dict(marker_color="#C0392B"),
+            increasing=dict(marker_color="#0071E3"),
+            totals=dict(marker_color="#1A7A4A"),
             hovertemplate="%{x}<br>$%{y:,.0f}<extra></extra>"
         ))
         fig2.update_layout(**CHART_LAYOUT,
-            title=dict(text="Return Waterfall", font=dict(size=12, color="#E8E8E8")),
+            title=dict(text="Return Waterfall", font=dict(size=12, color="#1D1D1F")),
             yaxis_tickprefix="$", yaxis_tickformat=",.0f", showlegend=False)
         st.plotly_chart(fig2, use_container_width=True)
 
@@ -1530,7 +1508,7 @@ with tab1:
         for val in row:
             try:
                 v = float(val.strip('%'))/100
-                color = "#2ECC71" if v >= 0.12 else ("#F39C12" if v >= 0.08 else "#E74C3C")
+                color = "#1A7A4A" if v >= 0.12 else ("#9A6700" if v >= 0.08 else "#E74C3C")
                 cells += f'<td style="color:{color}">{val}</td>'
             except:
                 cells += f"<td>{val}</td>"
@@ -1657,8 +1635,8 @@ Cold Chain Logistics,12000,2023-01-01,2030-12-31,7.25,3.0,0.85,7.50,3"""
         # A simple progress bar showing WALT vs hold period
         # If WALT > hold period, tenants are locked in — low rollover risk
         walt_pct = min(summary["walt"] / hold_years, 1.0) * 100
-        walt_color = "#2ECC71" if summary["walt"] >= hold_years * 0.6 else (
-                     "#F39C12" if summary["walt"] >= hold_years * 0.3 else "#E74C3C")
+        walt_color = "#1A7A4A" if summary["walt"] >= hold_years * 0.6 else (
+                     "#9A6700" if summary["walt"] >= hold_years * 0.3 else "#E74C3C")
         st.markdown(f"""
         <div style="margin: 0.5rem 0 1.5rem 0;">
             <div style="font-family:DM Mono,monospace;font-size:0.62rem;color:#9AA0B0;
@@ -1740,7 +1718,7 @@ Cold Chain Logistics,12000,2023-01-01,2030-12-31,7.25,3.0,0.85,7.50,3"""
             .map(style_risk,  subset=["Risk"])
             .map(style_mtm,   subset=["Mark-to-Mkt"])
             .set_properties(**{
-                "background-color": "#131929",
+                "background-color": "#FFFFFF",
                 "color": "#E8E8E8",
                 "font-family": "DM Mono, monospace",
                 "font-size": "12px",
@@ -1749,7 +1727,7 @@ Cold Chain Logistics,12000,2023-01-01,2030-12-31,7.25,3.0,0.85,7.50,3"""
             .set_table_styles([{
                 "selector": "th",
                 "props": [
-                    ("background-color", "#0A0E1A"),
+                    ("background-color", "#F5F5F7"),
                     ("color", "#C9A84C"),
                     ("font-family", "DM Mono, monospace"),
                     ("font-size", "11px"),
@@ -1772,8 +1750,8 @@ Cold Chain Logistics,12000,2023-01-01,2030-12-31,7.25,3.0,0.85,7.50,3"""
 
         # One bar trace per tenant, stacked
         # This shows which tenant's revenue drops when their lease rolls
-        COLORS = ["#C9A84C", "#4C9AC9", "#2ECC71", "#E74C3C", "#9B59B6",
-                  "#F39C12", "#1ABC9C", "#E67E22", "#3498DB", "#E91E63"]
+        COLORS = ["#C9A84C", "#4C9AC9", "#1A7A4A", "#E74C3C", "#9B59B6",
+                  "#9A6700", "#1ABC9C", "#E67E22", "#3498DB", "#E91E63"]
 
         fig3 = go.Figure()
         tenants = df_rr["tenant"].tolist()
@@ -1793,12 +1771,12 @@ Cold Chain Logistics,12000,2023-01-01,2030-12-31,7.25,3.0,0.85,7.50,3"""
 
         fig3.update_layout(
             **CHART_LAYOUT,
-            title=dict(text="Revenue by Tenant — Hold Period", font=dict(size=12, color="#E8E8E8")),
+            title=dict(text="Revenue by Tenant — Hold Period", font=dict(size=12, color="#1D1D1F")),
             barmode="stack",
             yaxis_tickprefix="$",
             yaxis_tickformat=",.0f",
             legend=dict(
-                font=dict(family="DM Sans", size=10, color="#9AA0B0"),
+                font=dict(family="Inter", size=10, color="#6E6E73"),
                 bgcolor="rgba(0,0,0,0)",
                 orientation="h",
                 yanchor="bottom", y=1.02,
@@ -1819,7 +1797,7 @@ Cold Chain Logistics,12000,2023-01-01,2030-12-31,7.25,3.0,0.85,7.50,3"""
             x=years_list,
             y=expiry_sf,
             marker_color=[
-                "#E74C3C" if p > 0.30 else ("#F39C12" if p > 0.15 else "#C9A84C")
+                "#E74C3C" if p > 0.30 else ("#9A6700" if p > 0.15 else "#C9A84C")
                 for p in expiry_pct
             ],
             marker_line_width=0,
@@ -1827,7 +1805,7 @@ Cold Chain Logistics,12000,2023-01-01,2030-12-31,7.25,3.0,0.85,7.50,3"""
         ))
         fig4.update_layout(
             **CHART_LAYOUT,
-            title=dict(text="SF Expiring by Year", font=dict(size=12, color="#E8E8E8")),
+            title=dict(text="SF Expiring by Year", font=dict(size=12, color="#1D1D1F")),
             yaxis_tickformat=",.0f",
             bargap=0.3
         )
@@ -1837,13 +1815,13 @@ Cold Chain Logistics,12000,2023-01-01,2030-12-31,7.25,3.0,0.85,7.50,3"""
         # ── Empty state ───────────────────────
         # Shows when no CSV has been uploaded yet
         st.markdown("""
-        <div style="background:var(--navy2);border:1px solid var(--border);
+        <div style="background:var(--surface);border:1px solid var(--border);
                     padding:2.5rem;border-radius:2px;text-align:center;margin-top:1rem;">
             <div style="font-size:2rem;margin-bottom:0.75rem;">📋</div>
             <div style="font-weight:600;margin-bottom:0.5rem;color:var(--white);">
                 No rent roll uploaded
             </div>
-            <div style="font-size:0.8rem;color:var(--white-dim);max-width:400px;margin:0 auto;">
+            <div style="font-size:0.8rem;color:var(--mid);max-width:400px;margin:0 auto;">
                 Upload a CSV with your tenant lease data to model rollover risk,
                 mark-to-market, and tenant-level revenue projections.
                 Download the sample above to see the required format.
@@ -1912,8 +1890,8 @@ with tab3:
         )
 
     st.markdown("""
-    <div style="background:var(--navy2);border:1px solid var(--border);border-left:3px solid var(--gold);
-                padding:0.75rem 1rem;border-radius:2px;font-size:0.78rem;color:var(--white-dim);margin:0.5rem 0 1rem 0;">
+    <div style="background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--gold);
+                padding:0.75rem 1rem;border-radius:2px;font-size:0.78rem;color:var(--mid);margin:0.5rem 0 1rem 0;">
         <strong style="color:var(--white);">Why this matters:</strong>
         The unadjusted IRR (Pro Forma tab) only reflects NOI growth and exit value.
         The adjusted IRR above is what your equity actually earns after writing checks for
@@ -1933,18 +1911,18 @@ with tab3:
 
     CHART_LAYOUT = dict(
         paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="#131929",
-        font=dict(family="DM Sans", color="#9AA0B0", size=11),
+        plot_bgcolor="#FFFFFF",
+        font=dict(family="Inter", color="#6E6E73", size=11),
         margin=dict(l=50, r=20, t=40, b=40),
         xaxis=dict(
-            gridcolor="rgba(255,255,255,0.05)",
-            zerolinecolor="rgba(255,255,255,0.1)",
-            tickfont=dict(family="DM Mono", size=10)
+            gridcolor="#E8E8ED",
+            zerolinecolor="#D2D2D7",
+            tickfont=dict(family="IBM Plex Mono", size=10)
         ),
         yaxis=dict(
-            gridcolor="rgba(255,255,255,0.05)",
-            zerolinecolor="rgba(255,255,255,0.1)",
-            tickfont=dict(family="DM Mono", size=10)
+            gridcolor="#E8E8ED",
+            zerolinecolor="#D2D2D7",
+            tickfont=dict(family="IBM Plex Mono", size=10)
         )
     )
 
@@ -1955,14 +1933,14 @@ with tab3:
     fig_capex.add_trace(go.Bar(
         name="CapEx Reserve",
         x=years_list, y=capex_by_yr,
-        marker_color="#4C6A9A",
+        marker_color="#5AC8FA",
         marker_line_width=0,
         hovertemplate="Year %{x}<br>CapEx Reserve: $%{y:,.0f}<extra></extra>"
     ))
     fig_capex.add_trace(go.Bar(
         name="Tenant Improvements",
         x=years_list, y=ti_by_yr,
-        marker_color="#C9A84C",
+        marker_color="#0071E3",
         marker_line_width=0,
         hovertemplate="Year %{x}<br>TI: $%{y:,.0f}<extra></extra>"
     ))
@@ -1976,12 +1954,12 @@ with tab3:
 
     fig_capex.update_layout(
         **CHART_LAYOUT,
-        title=dict(text="Capital Costs by Year", font=dict(size=12, color="#E8E8E8")),
+        title=dict(text="Capital Costs by Year", font=dict(size=12, color="#1D1D1F")),
         barmode="stack",
         yaxis_tickprefix="$",
         yaxis_tickformat=",.0f",
         legend=dict(
-            font=dict(family="DM Sans", size=10, color="#9AA0B0"),
+            font=dict(family="Inter", size=10, color="#6E6E73"),
             bgcolor="rgba(0,0,0,0)",
             orientation="h",
             yanchor="bottom", y=1.02,
@@ -2004,7 +1982,7 @@ with tab3:
     fig_bridge.add_trace(go.Scatter(
         name="NOI", x=years_list, y=noi_by_yr,
         mode="lines+markers",
-        line=dict(color="#2ECC71", width=2),
+        line=dict(color="#1A7A4A", width=2),
         marker=dict(size=5),
         hovertemplate="Year %{x}<br>NOI: $%{y:,.0f}<extra></extra>"
     ))
@@ -2025,11 +2003,11 @@ with tab3:
 
     fig_bridge.update_layout(
         **CHART_LAYOUT,
-        title=dict(text="NOI → Levered CF → Adjusted CF", font=dict(size=12, color="#E8E8E8")),
+        title=dict(text="NOI → Levered CF → Adjusted CF", font=dict(size=12, color="#1D1D1F")),
         yaxis_tickprefix="$",
         yaxis_tickformat=",.0f",
         legend=dict(
-            font=dict(family="DM Sans", size=10, color="#9AA0B0"),
+            font=dict(family="Inter", size=10, color="#6E6E73"),
             bgcolor="rgba(0,0,0,0)",
             orientation="h",
             yanchor="bottom", y=1.02,
@@ -2144,14 +2122,14 @@ with tab4:
         if val == "LP":
             return "color: #4C9AC9"
         elif val == "GP":
-            return "color: #C9A84C"
+            return "color: #0071E3"
         return ""
 
     styled_tiers = (
         df_tiers.style
         .map(color_recipient, subset=["Recipient"])
         .set_properties(**{
-            "background-color": "#131929",
+            "background-color": "#FFFFFF",
             "color": "#E8E8E8",
             "font-family": "DM Mono, monospace",
             "font-size": "12px",
@@ -2159,7 +2137,7 @@ with tab4:
         .set_table_styles([{
             "selector": "th",
             "props": [
-                ("background-color", "#0A0E1A"),
+                ("background-color", "#F5F5F7"),
                 ("color", "#C9A84C"),
                 ("font-family", "DM Mono, monospace"),
                 ("font-size", "11px"),
@@ -2176,17 +2154,17 @@ with tab4:
 
     CHART_LAYOUT_WF = dict(
         paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="#131929",
-        font=dict(family="DM Sans", color="#9AA0B0", size=11),
+        plot_bgcolor="#FFFFFF",
+        font=dict(family="Inter", color="#6E6E73", size=11),
         margin=dict(l=50, r=20, t=40, b=80),
         xaxis=dict(
-            gridcolor="rgba(255,255,255,0.05)",
-            tickfont=dict(family="DM Mono", size=9),
+            gridcolor="#E8E8ED",
+            tickfont=dict(family="IBM Plex Mono", size=9),
             tickangle=-20,
         ),
         yaxis=dict(
-            gridcolor="rgba(255,255,255,0.05)",
-            tickfont=dict(family="DM Mono", size=10),
+            gridcolor="#E8E8ED",
+            tickfont=dict(family="IBM Plex Mono", size=10),
         )
     )
 
@@ -2217,26 +2195,26 @@ with tab4:
     fig_wf.add_trace(go.Bar(
         name="LP Distribution",
         x=tier_labels, y=lp_amounts,
-        marker_color="#4C9AC9",
+        marker_color="#0071E3",
         marker_line_width=0,
         hovertemplate="%{x}<br>LP: $%{y:,.0f}<extra></extra>"
     ))
     fig_wf.add_trace(go.Bar(
         name="GP Distribution",
         x=tier_labels, y=gp_amounts,
-        marker_color="#C9A84C",
+        marker_color="#0071E3",
         marker_line_width=0,
         hovertemplate="%{x}<br>GP: $%{y:,.0f}<extra></extra>"
     ))
     fig_wf.update_layout(
         **CHART_LAYOUT_WF,
         title=dict(text="LP vs GP Distribution by Waterfall Tier",
-                   font=dict(size=12, color="#E8E8E8")),
+                   font=dict(size=12, color="#1D1D1F")),
         barmode="group",
         yaxis_tickprefix="$",
         yaxis_tickformat=",.0f",
         legend=dict(
-            font=dict(family="DM Sans", size=10, color="#9AA0B0"),
+            font=dict(family="Inter", size=10, color="#6E6E73"),
             bgcolor="rgba(0,0,0,0)",
             orientation="h",
             yanchor="bottom", y=1.02,
@@ -2255,17 +2233,17 @@ with tab4:
             labels=["LP Profit", "GP Promote"],
             values=[wf["lp_profit"], wf["gp_profit"]],
             hole=0.55,
-            marker=dict(colors=["#4C9AC9", "#C9A84C"],
-                        line=dict(color="#0A0E1A", width=2)),
-            textfont=dict(family="DM Mono", size=11),
+            marker=dict(colors=["#0071E3", "#1A7A4A"],
+                        line=dict(color="#F5F5F7", width=2)),
+            textfont=dict(family="IBM Plex Mono", size=11),
             hovertemplate="%{label}<br>$%{value:,.0f}<br>%{percent}<extra></extra>"
         ))
         fig_pie.update_layout(
             paper_bgcolor="rgba(0,0,0,0)",
-            font=dict(family="DM Sans", color="#9AA0B0"),
+            font=dict(family="Inter", color="#6E6E73"),
             margin=dict(l=20, r=20, t=40, b=20),
-            title=dict(text="Profit Split", font=dict(size=12, color="#E8E8E8")),
-            legend=dict(font=dict(family="DM Sans", size=10, color="#9AA0B0"),
+            title=dict(text="Profit Split", font=dict(size=12, color="#1D1D1F")),
+            legend=dict(font=dict(family="Inter", size=10, color="#6E6E73"),
                         bgcolor="rgba(0,0,0,0)")
         )
         st.plotly_chart(fig_pie, use_container_width=True)
@@ -2295,17 +2273,17 @@ with tab5:
     # Show what changed between scenarios
     assump_df = pd.DataFrame({
         "Assumption":    ["Occupancy", "NOI Growth (%/yr)", "Exit Cap Rate (%)"],
-        "🐻 Bear":       [
+        "Bear":       [
             f"{max(0.5, occupancy + bear_occ_adj/100):.0%}",
             f"{max(0.0, noi_growth + bear_rent_adj):.2f}%",
             f"{exit_cap + bear_cap_adj:.2f}%",
         ],
-        "📊 Base":       [
+        "Base":       [
             f"{occupancy:.0%}",
             f"{noi_growth:.2f}%",
             f"{exit_cap:.2f}%",
         ],
-        "🐂 Bull":       [
+        "Bull":       [
             f"{min(1.0, occupancy + bull_occ_adj/100):.0%}",
             f"{noi_growth + bull_rent_adj:.2f}%",
             f"{max(0.1, exit_cap + bull_cap_adj):.2f}%",
@@ -2323,7 +2301,7 @@ with tab5:
             "IRR (After CapEx)", "LP Equity Multiple",
             "GP Equity Multiple", "Sale Price", "Sale Proceeds",
         ],
-        "🐻 Bear": [
+        "Bear": [
             f"${s_bear['noi']:,.0f}",
             f"${s_bear['value']:,.0f}",
             f"{s_bear['dscr']:.2f}x",
@@ -2335,7 +2313,7 @@ with tab5:
             f"${s_bear['sale']:,.0f}",
             f"${s_bear['sp']:,.0f}",
         ],
-        "📊 Base": [
+        "Base": [
             f"${s_base['noi']:,.0f}",
             f"${s_base['value']:,.0f}",
             f"{s_base['dscr']:.2f}x",
@@ -2347,7 +2325,7 @@ with tab5:
             f"${s_base['sale']:,.0f}",
             f"${s_base['sp']:,.0f}",
         ],
-        "🐂 Bull": [
+        "Bull": [
             f"${s_bull['noi']:,.0f}",
             f"${s_bull['value']:,.0f}",
             f"{s_bull['dscr']:.2f}x",
@@ -2365,7 +2343,7 @@ with tab5:
         # Color IRR rows green/amber/red based on thresholds
         styles = [""] * len(row)
         if "IRR" in str(row.get("Metric", "")):
-            for i, col in enumerate(["🐻 Bear", "📊 Base", "🐂 Bull"]):
+            for i, col in enumerate(["Bear", "Base", "Bull"]):
                 if col in row.index:
                     try:
                         v = float(str(row[col]).replace("%","")) / 100
@@ -2386,26 +2364,26 @@ with tab5:
 
     CHART_LAYOUT_S = dict(
         paper_bgcolor="rgba(0,0,0,0)",
-        plot_bgcolor="#131929",
-        font=dict(family="DM Sans", color="#9AA0B0", size=11),
+        plot_bgcolor="#FFFFFF",
+        font=dict(family="Inter", color="#6E6E73", size=11),
         margin=dict(l=50, r=20, t=40, b=40),
         xaxis=dict(
-            gridcolor="rgba(255,255,255,0.05)",
-            tickfont=dict(family="DM Mono", size=11)
+            gridcolor="#E8E8ED",
+            tickfont=dict(family="IBM Plex Mono", size=11)
         ),
         yaxis=dict(
-            gridcolor="rgba(255,255,255,0.05)",
-            tickfont=dict(family="DM Mono", size=10),
+            gridcolor="#E8E8ED",
+            tickfont=dict(family="IBM Plex Mono", size=10),
         )
     )
 
     col_irr, col_em = st.columns(2)
 
     with col_irr:
-        scenario_names  = ["🐻 Bear", "📊 Base", "🐂 Bull"]
+        scenario_names  = ["Bear", "Base", "Bull"]
         irr_vals        = [s_bear["irr_adj"], s_base["irr_adj"], s_bull["irr_adj"]]
         irr_colors      = [
-            "#E74C3C" if v < 0.08 else ("#F39C12" if v < 0.12 else "#2ECC71")
+            "#E74C3C" if v < 0.08 else ("#9A6700" if v < 0.12 else "#1A7A4A")
             for v in irr_vals
         ]
 
@@ -2416,21 +2394,21 @@ with tab5:
             marker_line_width=0,
             text=[f"{v:.1%}" for v in irr_vals],
             textposition="outside",
-            textfont=dict(family="DM Mono", size=11, color="#E8E8E8"),
+            textfont=dict(family="IBM Plex Mono", size=11, color="#E8E8E8"),
             hovertemplate="%{x}<br>IRR: %{y:.2f}%<extra></extra>"
         ))
         # Hurdle line at 12%
         fig_irr.add_hline(
             y=12, line_dash="dot",
-            line_color="rgba(201,168,76,0.6)",
+            line_color="rgba(0,113,227,0.5)",
             annotation_text="12% hurdle",
-            annotation_font=dict(family="DM Mono", size=9, color="#C9A84C"),
+            annotation_font=dict(family="IBM Plex Mono", size=9, color="#C9A84C"),
             annotation_position="right"
         )
         fig_irr.update_layout(
             **CHART_LAYOUT_S,
             title=dict(text="IRR After CapEx — Scenario Comparison",
-                       font=dict(size=12, color="#E8E8E8")),
+                       font=dict(size=12, color="#1D1D1F")),
             yaxis_ticksuffix="%",
             showlegend=False,
             bargap=0.4
@@ -2441,7 +2419,7 @@ with tab5:
         # LP equity multiple across scenarios
         lp_ems = [s_bear["lp_em"], s_base["lp_em"], s_bull["lp_em"]]
         em_colors = [
-            "#E74C3C" if v < 1.5 else ("#F39C12" if v < 1.8 else "#2ECC71")
+            "#E74C3C" if v < 1.5 else ("#9A6700" if v < 1.8 else "#1A7A4A")
             for v in lp_ems
         ]
 
@@ -2452,20 +2430,20 @@ with tab5:
             marker_line_width=0,
             text=[f"{v:.2f}x" for v in lp_ems],
             textposition="outside",
-            textfont=dict(family="DM Mono", size=11, color="#E8E8E8"),
+            textfont=dict(family="IBM Plex Mono", size=11, color="#E8E8E8"),
             hovertemplate="%{x}<br>LP EM: %{y:.2f}x<extra></extra>"
         ))
         fig_em.add_hline(
             y=1.8, line_dash="dot",
-            line_color="rgba(201,168,76,0.6)",
+            line_color="rgba(0,113,227,0.5)",
             annotation_text="1.8x target",
-            annotation_font=dict(family="DM Mono", size=9, color="#C9A84C"),
+            annotation_font=dict(family="IBM Plex Mono", size=9, color="#C9A84C"),
             annotation_position="right"
         )
         fig_em.update_layout(
             **CHART_LAYOUT_S,
             title=dict(text="LP Equity Multiple — Scenario Comparison",
-                       font=dict(size=12, color="#E8E8E8")),
+                       font=dict(size=12, color="#1D1D1F")),
             showlegend=False,
             bargap=0.4
         )
@@ -2481,29 +2459,29 @@ with tab5:
     bull_vals = [s_bull["noi"], s_bull["value"], s_bull["sale"]]
 
     fig_bridge.add_trace(go.Bar(
-        name="🐻 Bear", x=metrics_bridge, y=bear_vals,
+        name="Bear", x=metrics_bridge, y=bear_vals,
         marker_color="#E74C3C", marker_line_width=0,
         hovertemplate="%{x}<br>Bear: $%{y:,.0f}<extra></extra>"
     ))
     fig_bridge.add_trace(go.Bar(
-        name="📊 Base", x=metrics_bridge, y=base_vals,
-        marker_color="#C9A84C", marker_line_width=0,
+        name="Base", x=metrics_bridge, y=base_vals,
+        marker_color="#0071E3", marker_line_width=0,
         hovertemplate="%{x}<br>Base: $%{y:,.0f}<extra></extra>"
     ))
     fig_bridge.add_trace(go.Bar(
-        name="🐂 Bull", x=metrics_bridge, y=bull_vals,
-        marker_color="#2ECC71", marker_line_width=0,
+        name="Bull", x=metrics_bridge, y=bull_vals,
+        marker_color="#1A7A4A", marker_line_width=0,
         hovertemplate="%{x}<br>Bull: $%{y:,.0f}<extra></extra>"
     ))
     fig_bridge.update_layout(
         **CHART_LAYOUT_S,
         title=dict(text="Key Metrics Across Scenarios",
-                   font=dict(size=12, color="#E8E8E8")),
+                   font=dict(size=12, color="#1D1D1F")),
         barmode="group",
         yaxis_tickprefix="$",
         yaxis_tickformat=",.0f",
         legend=dict(
-            font=dict(family="DM Sans", size=10, color="#9AA0B0"),
+            font=dict(family="Inter", size=10, color="#6E6E73"),
             bgcolor="rgba(0,0,0,0)",
             orientation="h",
             yanchor="bottom", y=1.02, xanchor="left", x=0
@@ -2520,12 +2498,12 @@ with tab5:
     base_irr = s_base["irr_adj"]
 
     if bear_irr >= 0.08 and base_irr >= 0.12:
-        ic_color = "#2ECC71"
+        ic_color = "#1A7A4A"
         ic_border = "rgba(46,204,113,0.3)"
         ic_bg     = "rgba(46,204,113,0.08)"
         ic_verdict = "✅ RECOMMEND — Deal holds above hurdle in base and bear cases"
     elif base_irr >= 0.10 and bear_irr >= 0.06:
-        ic_color = "#F39C12"
+        ic_color = "#9A6700"
         ic_border = "rgba(243,156,18,0.3)"
         ic_bg     = "rgba(243,156,18,0.08)"
         ic_verdict = "⚠️ CONDITIONAL — Base case acceptable; bear case needs work"
