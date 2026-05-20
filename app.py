@@ -701,7 +701,7 @@ def build_excel_export(
     def hdr_fill(hex_color):
         return PatternFill("solid", fgColor=hex_color)
 
-    def hdr_font(hex_color="1B2A4A", bold=True, size=10):
+    def hdr_font(hex_color="000000", bold=True, size=10):
         return Font(name="Calibri", color=hex_color, bold=bold, size=size)
 
     def num_font(size=10):
@@ -718,12 +718,12 @@ def build_excel_export(
         for c, (text, width) in enumerate(cols, 1):
             cell = ws.cell(row=row, column=c, value=text)
             cell.fill    = hdr_fill(fill_color)
-            cell.font    = Font(name="Calibri", color="1B2A4A", bold=True, size=10)
+            cell.font    = Font(name="Calibri", color="000000", bold=True, size=10)
             cell.alignment = Alignment(horizontal="center", vertical="center")
             cell.border  = thin_border()
             set_col_width(ws, c, width)
 
-    def write_data_row(ws, row, values, fmt=None, bold=False, color=WHITE):
+    def write_data_row(ws, row, values, fmt=None, bold=False, color="000000"):
         for c, val in enumerate(values, 1):
             cell = ws.cell(row=row, column=c, value=val)
             cell.fill   = hdr_fill("FFFFFF" if row % 2 == 0 else "F7F9FC")
@@ -747,7 +747,7 @@ def build_excel_export(
     title = ws1["A1"]
     title.value = f"INDUSTRIAL ASSET UNDERWRITING — {address.upper() if address else 'UNNAMED ASSET'}"
     title.fill  = hdr_fill("B8CCE4")
-    title.font  = Font(name="Calibri", color="1B2A4A", bold=True, size=13)
+    title.font  = Font(name="Calibri", color="000000", bold=True, size=13)
     title.alignment = Alignment(horizontal="left", vertical="center")
     ws1.row_dimensions[1].height = 28
 
@@ -755,7 +755,7 @@ def build_excel_export(
     sub = ws1["A2"]
     sub.value = f"{square_feet:,} RSF  |  Built {year_built}  |  {cap_rate:.2f}% Cap Rate  |  {hold_years:.0f}-Year Hold"
     sub.fill  = hdr_fill(NAVY2)
-    sub.font  = Font(name="Calibri", color="AABCCC", size=10)
+    sub.font  = Font(name="Calibri", color="000000", size=10)
     sub.alignment = Alignment(horizontal="left", vertical="center")
 
     # Section: NOI Build
@@ -764,7 +764,7 @@ def build_excel_export(
     sec = ws1[f"A{row}"]
     sec.value = "NOI BUILD"
     sec.fill  = hdr_fill("B8CCE4")
-    sec.font  = Font(name="Calibri", color="1B2A4A", bold=True, size=10)
+    sec.font  = Font(name="Calibri", color="000000", bold=True, size=10)
 
     row += 1
     write_header_row(ws1, row,
@@ -799,7 +799,7 @@ def build_excel_export(
     sec2 = ws1[f"A{row}"]
     sec2.value = "DEBT & RETURNS"
     sec2.fill  = hdr_fill("B8CCE4")
-    sec2.font  = Font(name="Calibri", color="1B2A4A", bold=True, size=10)
+    sec2.font  = Font(name="Calibri", color="000000", bold=True, size=10)
 
     row += 1
     write_header_row(ws1, row,
@@ -848,7 +848,7 @@ def build_excel_export(
     t2 = ws2["A1"]
     t2.value = "SCENARIO ANALYSIS — BEAR / BASE / BULL"
     t2.fill  = hdr_fill("B8CCE4")
-    t2.font  = Font(name="Calibri", color="1B2A4A", bold=True, size=13)
+    t2.font  = Font(name="Calibri", color="000000", bold=True, size=13)
     t2.alignment = Alignment(horizontal="left", vertical="center")
     ws2.row_dimensions[1].height = 28
 
@@ -891,7 +891,7 @@ def build_excel_export(
     t3 = ws3["A1"]
     t3.value = "CAPITAL EXPENDITURE SCHEDULE"
     t3.fill  = hdr_fill("B8CCE4")
-    t3.font  = Font(name="Calibri", color="1B2A4A", bold=True, size=13)
+    t3.font  = Font(name="Calibri", color="000000", bold=True, size=13)
     t3.alignment = Alignment(horizontal="left", vertical="center")
     ws3.row_dimensions[1].height = 28
 
@@ -954,7 +954,7 @@ def build_excel_export(
     t4 = ws4["A1"]
     t4.value = "LP / GP WATERFALL DISTRIBUTION"
     t4.fill  = hdr_fill("B8CCE4")
-    t4.font  = Font(name="Calibri", color="1B2A4A", bold=True, size=13)
+    t4.font  = Font(name="Calibri", color="000000", bold=True, size=13)
     t4.alignment = Alignment(horizontal="left", vertical="center")
     ws4.row_dimensions[1].height = 28
 
@@ -1008,7 +1008,7 @@ def build_excel_export(
         ws4.cell(row=row, column=1).alignment = Alignment(horizontal="left")
         cell = ws4.cell(row=row, column=2, value=val)
         cell.fill   = hdr_fill(NAVY3)
-        cell.font   = Font(name="Calibri", color="FFFFFF", bold=True, size=10)
+        cell.font   = Font(name="Calibri", color="000000", bold=True, size=10)
         cell.border = thin_border()
         cell.alignment = Alignment(horizontal="right")
         if isinstance(val, float):
@@ -1024,7 +1024,7 @@ def build_excel_export(
     t_cf = ws_cf["A1"]
     t_cf.value = "10-YEAR CASH FLOW PROJECTION"
     t_cf.fill  = hdr_fill("B8CCE4")
-    t_cf.font  = Font(name="Calibri", color="1B2A4A", bold=True, size=13)
+    t_cf.font  = Font(name="Calibri", color="000000", bold=True, size=13)
     t_cf.alignment = Alignment(horizontal="left", vertical="center")
     ws_cf.row_dimensions[1].height = 28
     row = 3
@@ -1069,7 +1069,7 @@ def build_excel_export(
         t5 = ws5["A1"]
         t5.value = "RENT ROLL"
         t5.fill  = hdr_fill("B8CCE4")
-        t5.font  = Font(name="Calibri", color="1B2A4A", bold=True, size=13)
+        t5.font  = Font(name="Calibri", color="000000", bold=True, size=13)
         t5.alignment = Alignment(horizontal="left", vertical="center")
         ws5.row_dimensions[1].height = 28
 
