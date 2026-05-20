@@ -769,7 +769,7 @@ def build_excel_export(
     row += 1
     write_header_row(ws1, row,
         [("Line Item",30),("Amount ($)",18),("$/SF",12),("% of GPI",14)],
-        NAVY)
+        "D6EAFF")
 
     noi_rows = [
         ("Gross Potential Income", gross_potential_income, gross_potential_income/square_feet, 1.0),
@@ -788,7 +788,7 @@ def build_excel_export(
     for label, amt, psf, pct in noi_rows:
         row += 1
         is_sep = label in SEPARATORS
-        color  = GOLD if label == "Net Operating Income" else WHITE
+        color  = "000000"
         write_data_row(ws1, row, [label, amt, psf, pct],
                        fmt=["General","#,##0","#,##0.00","0.0%"],
                        bold=is_sep, color=color)
