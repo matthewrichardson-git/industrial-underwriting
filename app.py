@@ -293,6 +293,15 @@ with st.sidebar:
     new_lease_term_yrs = st.number_input("New Lease Term (yrs)", min_value=1, max_value=20, value=5, step=1)
 
     st.markdown('<div class="sidebar-section">LP / GP Waterfall</div>', unsafe_allow_html=True)
+    st.markdown('<div class="sidebar-section">Scenario Analysis</div>', unsafe_allow_html=True)
+    bear_rent_adj   = st.number_input("Bear — Rent Growth Adj (%)", min_value=-5.0, max_value=0.0, value=-1.0, step=0.25)
+    bear_cap_adj    = st.number_input("Bear — Exit Cap Adj (%)",    min_value=0.0,  max_value=3.0,  value=0.75, step=0.25)
+    bear_occ_adj    = st.number_input("Bear — Occupancy Adj (%)",   min_value=-20.0, max_value=0.0, value=-5.0, step=1.0)
+    bull_rent_adj   = st.number_input("Bull — Rent Growth Adj (%)", min_value=0.0,  max_value=5.0,  value=1.0,  step=0.25)
+    bull_cap_adj    = st.number_input("Bull — Exit Cap Adj (%)",    min_value=-3.0, max_value=0.0,  value=-0.5, step=0.25)
+    bull_occ_adj    = st.number_input("Bull — Occupancy Adj (%)",   min_value=0.0,  max_value=10.0, value=2.0,  step=1.0)
+
+    st.markdown('<div class="sidebar-section">LP / GP Waterfall</div>', unsafe_allow_html=True)
     lp_equity_pct   = st.number_input("LP Equity (%)", min_value=50.0, max_value=99.0, value=90.0, step=5.0)
     pref_return     = st.number_input("Preferred Return (%)", min_value=0.0, max_value=15.0, value=8.0, step=0.5)
     promote_tier1   = st.number_input("Promote — Tier 1 (%)", min_value=0.0, max_value=50.0, value=20.0, step=5.0)
@@ -557,6 +566,113 @@ def build_waterfall(equity_invested, annual_cfs, sale_proceeds_val,
         "total_pool":     total_pool,
     }
 
+# ─────────────────────────────────────────────
+#  SCENARIO ENGINE
+#  Runs full calculation stack for bear/base/bull
+#  Returns a dict of metrics for each scenario
+# ─────────────────────────────────────────────
+def run_scenario(sq_ft, rent_psf_s, occupancy_s, other_inc,
+                 mgmt_pct, ins_psf, tax_psf, maint_psf,
+                 cap_rate_s, ltv_s, int_rate, amort_yrs,
+                 hold_yrs, noi_gr, exit_cap_s,
+                 cap_psf_s, ti_new, ti_renew, lc_p, lease_term,
+                 lp_pct, pref_p, prom_t1, hurd_t1, prom_t2, hurd_t2):
+    """Runs the full underwriting stack for one scenario.
+    Returns a dict of key metrics."""
+    import numpy_financial as _npf
+
+    # Income
+    gpi  = sq_ft * rent_psf_s
+    vac  = gpi * (1 - occupancy_s)
+    egi  = gpi - vac + other_inc
+    exp  = egi*(mgmt_pct/100) + sq_ft*(ins_psf+tax_psf+maint_psf)
+    noi  = egi - exp
+
+    # Valuation & debt
+    val  = noi / (cap_rate_s / 100)
+    loan = val * (ltv_s / 100)
+    mr   = (int_rate / 100) / 12
+    np_  = amort_yrs * 12
+    pmt  = loan * (mr * (1+mr)**np_) / ((1+mr)**np_ - 1)
+    ads  = pmt * 12
+    dscr = noi / ads
+    eq   = val - loan
+    coc  = (noi - ads) / eq
+
+    # Remaining balance
+    pm   = int(hold_yrs) * 12
+    rp   = (amort_yrs * 12) - pm
+    rb   = pmt * (1 - (1+mr)**-rp) / mr
+
+    # Cash flows
+    noi_l = [noi*(1+noi_gr/100)**yr for yr in range(1, int(hold_yrs)+1)]
+    acf   = [n - ads for n in noi_l]
+    en    = noi*(1+noi_gr/100)**(hold_yrs+1)
+    sp    = en/(exit_cap_s/100) - rb
+    sale  = en/(exit_cap_s/100)
+    acf[-1] += sp
+    cfs   = [-eq] + acf
+    irr   = _npf.irr(cfs)
+    em    = sum(acf) / eq  # simplified EM
+
+    # CapEx drag
+    cx = build_capex_schedule(sq_ft, hold_yrs, cap_psf_s,
+                               ti_new, ti_renew, lc_p, lease_term)
+    adj = [-eq] + [cf - cx["annual_totals"][yr]
+                   for yr, cf in enumerate(acf, 1)]
+    irr_adj = _npf.irr(adj)
+
+    # Waterfall
+    wf = build_waterfall(eq, acf, sp, lp_pct, pref_p,
+                         prom_t1, hurd_t1, prom_t2, hurd_t2, hold_yrs)
+
+    return {
+        "noi":      noi,
+        "value":    val,
+        "dscr":     dscr,
+        "coc":      coc,
+        "irr":      irr,
+        "irr_adj":  irr_adj,
+        "lp_em":    wf["lp_em"],
+        "gp_em":    wf["gp_em"],
+        "sale":     sale,
+        "sp":       sp,
+    }
+
+# Build assumption sets
+base_args = dict(
+    sq_ft=square_feet, rent_psf_s=rent_psf, occupancy_s=occupancy,
+    other_inc=other_income, mgmt_pct=mgmt_fee_pct, ins_psf=insurance_psf,
+    tax_psf=re_taxes_psf, maint_psf=maintenance_psf,
+    cap_rate_s=cap_rate, ltv_s=ltv, int_rate=interest_rate,
+    amort_yrs=amort_years, hold_yrs=hold_years, noi_gr=noi_growth,
+    exit_cap_s=exit_cap, cap_psf_s=capex_psf, ti_new=ti_new_psf,
+    ti_renew=ti_renewal_psf, lc_p=lc_pct, lease_term=new_lease_term_yrs,
+    lp_pct=lp_equity_pct/100, pref_p=pref_return/100,
+    prom_t1=promote_tier1, hurd_t1=hurdle_tier1,
+    prom_t2=promote_tier2, hurd_t2=hurdle_tier2,
+)
+bear_args = {**base_args,
+    "occupancy_s": max(0.5,  occupancy  + bear_occ_adj/100),
+    "noi_gr":      max(0.0,  noi_growth + bear_rent_adj),
+    "exit_cap_s":  exit_cap + bear_cap_adj,
+}
+bull_args = {**base_args,
+    "occupancy_s": min(1.0,  occupancy  + bull_occ_adj/100),
+    "noi_gr":      noi_growth + bull_rent_adj,
+    "exit_cap_s":  max(0.1,  exit_cap   + bull_cap_adj),
+}
+
+s_bear = run_scenario(**bear_args)
+s_base = run_scenario(**base_args)
+s_bull = run_scenario(**bull_args)
+
+scenarios = {
+    "🐻 Bear": s_bear,
+    "📊 Base": s_base,
+    "🐂 Bull": s_bull,
+}
+
 # Run waterfall with current inputs
 # Use the operating cash flows (exclude sale, which we pass separately)
 wf = build_waterfall(
@@ -774,7 +890,7 @@ st.markdown(f"""
 # ─────────────────────────────────────────────
 #  TABS — Pro Forma | Rent Roll
 # ─────────────────────────────────────────────
-tab1, tab2, tab3, tab4 = st.tabs(["Pro Forma", "Rent Roll", "CapEx & Returns", "LP/GP Waterfall"])
+tab1, tab2, tab3, tab4, tab5 = st.tabs(["Pro Forma", "Rent Roll", "CapEx & Returns", "LP/GP Waterfall", "Scenarios"])
 
 
 # ═════════════════════════════════════════════
@@ -1618,3 +1734,275 @@ with tab4:
                     f"{wf['gp_promote_pct']:.1%}",
                     f"Of total profits vs {gp_equity_pct:.0f}% equity contribution",
                     "metric-pass")
+
+
+# ═════════════════════════════════════════════
+#  TAB 5 — SCENARIO ANALYSIS
+# ═════════════════════════════════════════════
+with tab5:
+
+    section("Scenario Assumptions")
+
+    # Show what changed between scenarios
+    assump_df = pd.DataFrame({
+        "Assumption":    ["Occupancy", "NOI Growth (%/yr)", "Exit Cap Rate (%)"],
+        "🐻 Bear":       [
+            f"{max(0.5, occupancy + bear_occ_adj/100):.0%}",
+            f"{max(0.0, noi_growth + bear_rent_adj):.2f}%",
+            f"{exit_cap + bear_cap_adj:.2f}%",
+        ],
+        "📊 Base":       [
+            f"{occupancy:.0%}",
+            f"{noi_growth:.2f}%",
+            f"{exit_cap:.2f}%",
+        ],
+        "🐂 Bull":       [
+            f"{min(1.0, occupancy + bull_occ_adj/100):.0%}",
+            f"{noi_growth + bull_rent_adj:.2f}%",
+            f"{max(0.1, exit_cap + bull_cap_adj):.2f}%",
+        ],
+    })
+    st.dataframe(assump_df, use_container_width=True, hide_index=True)
+
+    # ── Returns comparison table ───────────────
+    section("Returns Comparison — Bear / Base / Bull")
+
+    metrics_df = pd.DataFrame({
+        "Metric": [
+            "NOI", "Implied Value", "DSCR",
+            "Cash-on-Cash", "IRR (Unadjusted)",
+            "IRR (After CapEx)", "LP Equity Multiple",
+            "GP Equity Multiple", "Sale Price", "Sale Proceeds",
+        ],
+        "🐻 Bear": [
+            f"${s_bear['noi']:,.0f}",
+            f"${s_bear['value']:,.0f}",
+            f"{s_bear['dscr']:.2f}x",
+            f"{s_bear['coc']:.1%}",
+            f"{s_bear['irr']:.1%}",
+            f"{s_bear['irr_adj']:.1%}",
+            f"{s_bear['lp_em']:.2f}x",
+            f"{s_bear['gp_em']:.2f}x",
+            f"${s_bear['sale']:,.0f}",
+            f"${s_bear['sp']:,.0f}",
+        ],
+        "📊 Base": [
+            f"${s_base['noi']:,.0f}",
+            f"${s_base['value']:,.0f}",
+            f"{s_base['dscr']:.2f}x",
+            f"{s_base['coc']:.1%}",
+            f"{s_base['irr']:.1%}",
+            f"{s_base['irr_adj']:.1%}",
+            f"{s_base['lp_em']:.2f}x",
+            f"{s_base['gp_em']:.2f}x",
+            f"${s_base['sale']:,.0f}",
+            f"${s_base['sp']:,.0f}",
+        ],
+        "🐂 Bull": [
+            f"${s_bull['noi']:,.0f}",
+            f"${s_bull['value']:,.0f}",
+            f"{s_bull['dscr']:.2f}x",
+            f"{s_bull['coc']:.1%}",
+            f"{s_bull['irr']:.1%}",
+            f"{s_bull['irr_adj']:.1%}",
+            f"{s_bull['lp_em']:.2f}x",
+            f"{s_bull['gp_em']:.2f}x",
+            f"${s_bull['sale']:,.0f}",
+            f"${s_bull['sp']:,.0f}",
+        ],
+    })
+
+    def color_scenario_row(row):
+        # Color IRR rows green/amber/red based on thresholds
+        styles = [""] * len(row)
+        if "IRR" in str(row.get("Metric", "")):
+            for i, col in enumerate(["🐻 Bear", "📊 Base", "🐂 Bull"]):
+                if col in row.index:
+                    try:
+                        v = float(str(row[col]).replace("%","")) / 100
+                        if v >= 0.12:
+                            styles[row.index.get_loc(col)] = "color: #2ECC71"
+                        elif v >= 0.08:
+                            styles[row.index.get_loc(col)] = "color: #F39C12"
+                        else:
+                            styles[row.index.get_loc(col)] = "color: #E74C3C"
+                    except:
+                        pass
+        return styles
+
+    st.dataframe(metrics_df, use_container_width=True, hide_index=True)
+
+    # ── IRR bar chart — bear/base/bull ─────────
+    section("IRR Across Scenarios")
+
+    CHART_LAYOUT_S = dict(
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="#131929",
+        font=dict(family="DM Sans", color="#9AA0B0", size=11),
+        margin=dict(l=50, r=20, t=40, b=40),
+        xaxis=dict(
+            gridcolor="rgba(255,255,255,0.05)",
+            tickfont=dict(family="DM Mono", size=11)
+        ),
+        yaxis=dict(
+            gridcolor="rgba(255,255,255,0.05)",
+            tickfont=dict(family="DM Mono", size=10),
+        )
+    )
+
+    col_irr, col_em = st.columns(2)
+
+    with col_irr:
+        scenario_names  = ["🐻 Bear", "📊 Base", "🐂 Bull"]
+        irr_vals        = [s_bear["irr_adj"], s_base["irr_adj"], s_bull["irr_adj"]]
+        irr_colors      = [
+            "#E74C3C" if v < 0.08 else ("#F39C12" if v < 0.12 else "#2ECC71")
+            for v in irr_vals
+        ]
+
+        fig_irr = go.Figure()
+        fig_irr.add_trace(go.Bar(
+            x=scenario_names, y=[v*100 for v in irr_vals],
+            marker_color=irr_colors,
+            marker_line_width=0,
+            text=[f"{v:.1%}" for v in irr_vals],
+            textposition="outside",
+            textfont=dict(family="DM Mono", size=11, color="#E8E8E8"),
+            hovertemplate="%{x}<br>IRR: %{y:.2f}%<extra></extra>"
+        ))
+        # Hurdle line at 12%
+        fig_irr.add_hline(
+            y=12, line_dash="dot",
+            line_color="rgba(201,168,76,0.6)",
+            annotation_text="12% hurdle",
+            annotation_font=dict(family="DM Mono", size=9, color="#C9A84C"),
+            annotation_position="right"
+        )
+        fig_irr.update_layout(
+            **CHART_LAYOUT_S,
+            title=dict(text="IRR After CapEx — Scenario Comparison",
+                       font=dict(size=12, color="#E8E8E8")),
+            yaxis_ticksuffix="%",
+            showlegend=False,
+            bargap=0.4
+        )
+        st.plotly_chart(fig_irr, use_container_width=True)
+
+    with col_em:
+        # LP equity multiple across scenarios
+        lp_ems = [s_bear["lp_em"], s_base["lp_em"], s_bull["lp_em"]]
+        em_colors = [
+            "#E74C3C" if v < 1.5 else ("#F39C12" if v < 1.8 else "#2ECC71")
+            for v in lp_ems
+        ]
+
+        fig_em = go.Figure()
+        fig_em.add_trace(go.Bar(
+            x=scenario_names, y=lp_ems,
+            marker_color=em_colors,
+            marker_line_width=0,
+            text=[f"{v:.2f}x" for v in lp_ems],
+            textposition="outside",
+            textfont=dict(family="DM Mono", size=11, color="#E8E8E8"),
+            hovertemplate="%{x}<br>LP EM: %{y:.2f}x<extra></extra>"
+        ))
+        fig_em.add_hline(
+            y=1.8, line_dash="dot",
+            line_color="rgba(201,168,76,0.6)",
+            annotation_text="1.8x target",
+            annotation_font=dict(family="DM Mono", size=9, color="#C9A84C"),
+            annotation_position="right"
+        )
+        fig_em.update_layout(
+            **CHART_LAYOUT_S,
+            title=dict(text="LP Equity Multiple — Scenario Comparison",
+                       font=dict(size=12, color="#E8E8E8")),
+            showlegend=False,
+            bargap=0.4
+        )
+        st.plotly_chart(fig_em, use_container_width=True)
+
+    # ── NOI & Value waterfall across scenarios ─
+    section("NOI & Value Bridge — Bear to Bull")
+
+    fig_bridge = go.Figure()
+    metrics_bridge = ["NOI", "Implied Value", "Sale Price"]
+    bear_vals = [s_bear["noi"], s_bear["value"], s_bear["sale"]]
+    base_vals = [s_base["noi"], s_base["value"], s_base["sale"]]
+    bull_vals = [s_bull["noi"], s_bull["value"], s_bull["sale"]]
+
+    fig_bridge.add_trace(go.Bar(
+        name="🐻 Bear", x=metrics_bridge, y=bear_vals,
+        marker_color="#E74C3C", marker_line_width=0,
+        hovertemplate="%{x}<br>Bear: $%{y:,.0f}<extra></extra>"
+    ))
+    fig_bridge.add_trace(go.Bar(
+        name="📊 Base", x=metrics_bridge, y=base_vals,
+        marker_color="#C9A84C", marker_line_width=0,
+        hovertemplate="%{x}<br>Base: $%{y:,.0f}<extra></extra>"
+    ))
+    fig_bridge.add_trace(go.Bar(
+        name="🐂 Bull", x=metrics_bridge, y=bull_vals,
+        marker_color="#2ECC71", marker_line_width=0,
+        hovertemplate="%{x}<br>Bull: $%{y:,.0f}<extra></extra>"
+    ))
+    fig_bridge.update_layout(
+        **CHART_LAYOUT_S,
+        title=dict(text="Key Metrics Across Scenarios",
+                   font=dict(size=12, color="#E8E8E8")),
+        barmode="group",
+        yaxis_tickprefix="$",
+        yaxis_tickformat=",.0f",
+        legend=dict(
+            font=dict(family="DM Sans", size=10, color="#9AA0B0"),
+            bgcolor="rgba(0,0,0,0)",
+            orientation="h",
+            yanchor="bottom", y=1.02, xanchor="left", x=0
+        ),
+        bargap=0.2, bargroupgap=0.05
+    )
+    st.plotly_chart(fig_bridge, use_container_width=True)
+
+    # ── IC memo verdict box ────────────────────
+    section("Investment Committee Summary")
+
+    bear_irr = s_bear["irr_adj"]
+    bull_irr = s_bull["irr_adj"]
+    base_irr = s_base["irr_adj"]
+
+    if bear_irr >= 0.08 and base_irr >= 0.12:
+        ic_color = "#2ECC71"
+        ic_border = "rgba(46,204,113,0.3)"
+        ic_bg     = "rgba(46,204,113,0.08)"
+        ic_verdict = "✅ RECOMMEND — Deal holds above hurdle in base and bear cases"
+    elif base_irr >= 0.10 and bear_irr >= 0.06:
+        ic_color = "#F39C12"
+        ic_border = "rgba(243,156,18,0.3)"
+        ic_bg     = "rgba(243,156,18,0.08)"
+        ic_verdict = "⚠️ CONDITIONAL — Base case acceptable; bear case needs work"
+    else:
+        ic_color = "#E74C3C"
+        ic_border = "rgba(231,76,60,0.3)"
+        ic_bg     = "rgba(231,76,60,0.08)"
+        ic_verdict = "❌ PASS — Returns insufficient across scenarios"
+
+    st.markdown(f"""
+    <div style="background:{ic_bg};border:1px solid {ic_border};
+                border-left:4px solid {ic_color};
+                padding:1.25rem 1.5rem;border-radius:2px;margin-top:0.5rem;">
+        <div style="font-family:DM Mono,monospace;font-size:0.7rem;
+                    letter-spacing:0.1em;text-transform:uppercase;
+                    color:{ic_color};margin-bottom:0.5rem;">
+            IC Verdict
+        </div>
+        <div style="font-size:1rem;font-weight:600;color:#E8E8E8;margin-bottom:0.75rem;">
+            {ic_verdict}
+        </div>
+        <div style="font-size:0.78rem;color:#9AA0B0;font-family:DM Mono,monospace;">
+            Bear IRR: {bear_irr:.1%} &nbsp;|&nbsp;
+            Base IRR: {base_irr:.1%} &nbsp;|&nbsp;
+            Bull IRR: {bull_irr:.1%} &nbsp;|&nbsp;
+            LP EM (Base): {s_base['lp_em']:.2f}x
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
