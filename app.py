@@ -673,6 +673,431 @@ scenarios = {
     "🐂 Bull": s_bull,
 }
 
+# ─────────────────────────────────────────────
+#  EXCEL EXPORT ENGINE
+#  Builds a multi-sheet .xlsx workbook using
+#  openpyxl with institutional formatting:
+#  navy headers, gold accents, number formats.
+#  Returns bytes that Streamlit can serve as
+#  a download button.
+# ─────────────────────────────────────────────
+def build_excel_export(
+    address, square_feet, year_built,
+    rent_psf, occupancy, other_income,
+    mgmt_fee_pct, insurance_psf, re_taxes_psf, maintenance_psf,
+    gross_potential_income, vacancy_loss, egi,
+    mgmt_fee, insurance, re_taxes, maintenance, total_expenses, noi,
+    cap_rate, value, loan_amount, annual_debt_service, dscr,
+    levered_cash_flow, equity_invested, cash_on_cash,
+    irr, irr_adj, sale_price, sale_proceeds,
+    hold_years, noi_growth, exit_cap,
+    capex_summary, wf_data,
+    s_bear, s_base, s_bull,
+    bear_args, base_args, bull_args,
+    lp_equity_pct, pref_return, promote_tier1, hurdle_tier1,
+    promote_tier2, hurdle_tier2,
+    rent_roll_df=None
+):
+    import openpyxl
+    from openpyxl.styles import (PatternFill, Font, Alignment,
+                                  Border, Side, numbers)
+    from openpyxl.utils import get_column_letter
+    import io
+
+    wb = openpyxl.Workbook()
+    wb.remove(wb.active)  # remove default sheet
+
+    # ── Style constants ──────────────────────
+    NAVY    = "0A0E1A"
+    NAVY2   = "131929"
+    NAVY3   = "1C2333"
+    GOLD    = "C9A84C"
+    WHITE   = "E8E8E8"
+    GREEN   = "2ECC71"
+    RED     = "E74C3C"
+    AMBER   = "F39C12"
+
+    def hdr_fill(hex_color):
+        return PatternFill("solid", fgColor=hex_color)
+
+    def hdr_font(hex_color=WHITE, bold=True, size=10):
+        return Font(name="Calibri", color=hex_color, bold=bold, size=size)
+
+    def num_font(size=10):
+        return Font(name="Calibri", color=WHITE, size=size)
+
+    def thin_border():
+        s = Side(style="thin", color="1C2333")
+        return Border(left=s, right=s, top=s, bottom=s)
+
+    def set_col_width(ws, col, width):
+        ws.column_dimensions[get_column_letter(col)].width = width
+
+    def write_header_row(ws, row, cols, fill_color=NAVY2):
+        for c, (text, width) in enumerate(cols, 1):
+            cell = ws.cell(row=row, column=c, value=text)
+            cell.fill    = hdr_fill(fill_color)
+            cell.font    = hdr_font(GOLD)
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            cell.border  = thin_border()
+            set_col_width(ws, c, width)
+
+    def write_data_row(ws, row, values, fmt=None, bold=False, color=WHITE):
+        for c, val in enumerate(values, 1):
+            cell = ws.cell(row=row, column=c, value=val)
+            cell.fill   = hdr_fill(NAVY2 if row % 2 == 0 else NAVY3)
+            cell.font   = Font(name="Calibri", color=color,
+                               bold=bold, size=10)
+            cell.border = thin_border()
+            cell.alignment = Alignment(horizontal="right" if c > 1 else "left",
+                                       vertical="center")
+            if fmt and c < len(fmt)+1:
+                cell.number_format = fmt[c-1] if fmt[c-1] else "General"
+
+    # ════════════════════════════════════════
+    #  SHEET 1 — PRO FORMA
+    # ════════════════════════════════════════
+    ws1 = wb.create_sheet("Pro Forma")
+    ws1.sheet_view.showGridLines = False
+    ws1.sheet_properties.tabColor = GOLD
+
+    # Title block
+    ws1.merge_cells("A1:D1")
+    title = ws1["A1"]
+    title.value = f"INDUSTRIAL ASSET UNDERWRITING — {address.upper() if address else 'UNNAMED ASSET'}"
+    title.fill  = hdr_fill(NAVY)
+    title.font  = Font(name="Calibri", color=GOLD, bold=True, size=13)
+    title.alignment = Alignment(horizontal="left", vertical="center")
+    ws1.row_dimensions[1].height = 28
+
+    ws1.merge_cells("A2:D2")
+    sub = ws1["A2"]
+    sub.value = f"{square_feet:,} RSF  |  Built {year_built}  |  {cap_rate:.2f}% Cap Rate  |  {hold_years:.0f}-Year Hold"
+    sub.fill  = hdr_fill(NAVY2)
+    sub.font  = Font(name="Calibri", color="9AA0B0", size=10)
+    sub.alignment = Alignment(horizontal="left", vertical="center")
+
+    # Section: NOI Build
+    row = 4
+    ws1.merge_cells(f"A{row}:D{row}")
+    sec = ws1[f"A{row}"]
+    sec.value = "NOI BUILD"
+    sec.fill  = hdr_fill(NAVY)
+    sec.font  = Font(name="Calibri", color=GOLD, bold=True, size=10)
+
+    row += 1
+    write_header_row(ws1, row,
+        [("Line Item",30),("Amount ($)",18),("$/SF",12),("% of GPI",14)],
+        NAVY)
+
+    noi_rows = [
+        ("Gross Potential Income", gross_potential_income, gross_potential_income/square_feet, 1.0),
+        ("Vacancy Loss",           -vacancy_loss,         -vacancy_loss/square_feet,          -vacancy_loss/gross_potential_income),
+        ("Other Income",           other_income,           other_income/square_feet,            other_income/gross_potential_income),
+        ("Effective Gross Income", egi,                    egi/square_feet,                    egi/gross_potential_income),
+        ("Management Fee",         -mgmt_fee,             -mgmt_fee/square_feet,              -mgmt_fee/gross_potential_income),
+        ("Insurance",              -insurance,            -insurance/square_feet,             -insurance/gross_potential_income),
+        ("Real Estate Taxes",      -re_taxes,             -re_taxes/square_feet,              -re_taxes/gross_potential_income),
+        ("Maintenance & Repairs",  -maintenance,          -maintenance/square_feet,           -maintenance/gross_potential_income),
+        ("Total Expenses",         -total_expenses,       -total_expenses/square_feet,        -total_expenses/gross_potential_income),
+        ("Net Operating Income",   noi,                    noi/square_feet,                    noi/gross_potential_income),
+    ]
+    SEPARATORS = {"Effective Gross Income", "Total Expenses", "Net Operating Income"}
+    dollar_fmt = ['#,##0', '#,##0.00', '0.0%']
+    for label, amt, psf, pct in noi_rows:
+        row += 1
+        is_sep = label in SEPARATORS
+        color  = GOLD if label == "Net Operating Income" else WHITE
+        write_data_row(ws1, row, [label, amt, psf, pct],
+                       fmt=["General","#,##0","#,##0.00","0.0%"],
+                       bold=is_sep, color=color)
+
+    # Section: Debt & Returns
+    row += 2
+    ws1.merge_cells(f"A{row}:D{row}")
+    sec2 = ws1[f"A{row}"]
+    sec2.value = "DEBT & RETURNS"
+    sec2.fill  = hdr_fill(NAVY)
+    sec2.font  = Font(name="Calibri", color=GOLD, bold=True, size=10)
+
+    row += 1
+    write_header_row(ws1, row,
+        [("Metric",30),("Value",18),("Threshold",18),("Status",14)], NAVY)
+
+    debt_rows = [
+        ("Implied Property Value",   value,                "—",        "—"),
+        ("Loan Amount",              loan_amount,          "—",        "—"),
+        ("Annual Debt Service",      annual_debt_service,  "—",        "—"),
+        ("DSCR",                     f"{dscr:.2f}x",       "≥ 1.25x",  "✓ Pass" if dscr>=1.25 else "✗ Fail"),
+        ("Cash-on-Cash Return",      f"{cash_on_cash:.1%}","≥ 7.0%",   "✓ Pass" if cash_on_cash>=0.07 else "✗ Fail"),
+        ("IRR (Unadjusted)",         f"{irr:.1%}",         "≥ 12.0%",  "✓ Pass" if irr>=0.12 else "✗ Fail"),
+        ("IRR (After CapEx/TI/LC)",  f"{irr_adj:.1%}",     "≥ 12.0%",  "✓ Pass" if irr_adj>=0.12 else "✗ Fail"),
+        ("Sale Price",               sale_price,           "—",        "—"),
+        ("Sale Proceeds (Net)",      sale_proceeds,        "—",        "—"),
+        ("Equity Invested",          equity_invested,      "—",        "—"),
+    ]
+    for i, (label, val, thresh, status) in enumerate(debt_rows):
+        row += 1
+        cell_color = GREEN if "✓" in str(status) else (RED if "✗" in str(status) else WHITE)
+        ws1.cell(row=row, column=1, value=label).fill  = hdr_fill(NAVY2 if row%2==0 else NAVY3)
+        ws1.cell(row=row, column=1).font  = num_font()
+        ws1.cell(row=row, column=1).border = thin_border()
+        ws1.cell(row=row, column=1).alignment = Alignment(horizontal="left")
+        for c, v in enumerate([val, thresh, status], 2):
+            cell = ws1.cell(row=row, column=c, value=v)
+            cell.fill   = hdr_fill(NAVY2 if row%2==0 else NAVY3)
+            cell.font   = Font(name="Calibri",
+                               color=cell_color if c==4 else WHITE,
+                               size=10, bold=(c==4))
+            cell.border = thin_border()
+            cell.alignment = Alignment(horizontal="right" if c>1 else "left")
+            if isinstance(v, float) and v > 100:
+                cell.number_format = "#,##0"
+
+    # ════════════════════════════════════════
+    #  SHEET 2 — SCENARIO ANALYSIS
+    # ════════════════════════════════════════
+    ws2 = wb.create_sheet("Scenario Analysis")
+    ws2.sheet_view.showGridLines = False
+    ws2.sheet_properties.tabColor = "4C9AC9"
+
+    ws2.merge_cells("A1:D1")
+    t2 = ws2["A1"]
+    t2.value = "SCENARIO ANALYSIS — BEAR / BASE / BULL"
+    t2.fill  = hdr_fill(NAVY)
+    t2.font  = Font(name="Calibri", color=GOLD, bold=True, size=13)
+    t2.alignment = Alignment(horizontal="left", vertical="center")
+    ws2.row_dimensions[1].height = 28
+
+    row = 3
+    write_header_row(ws2, row,
+        [("Metric",28),("🐻 Bear",18),("📊 Base",18),("🐂 Bull",18)], NAVY)
+
+    scenario_rows = [
+        ("Occupancy",          f"{bear_args['occupancy_s']:.0%}",   f"{base_args['occupancy_s']:.0%}",   f"{bull_args['occupancy_s']:.0%}"),
+        ("NOI Growth (%/yr)",  f"{bear_args['noi_gr']:.2f}%",       f"{base_args['noi_gr']:.2f}%",       f"{bull_args['noi_gr']:.2f}%"),
+        ("Exit Cap Rate (%)",  f"{bear_args['exit_cap_s']:.2f}%",   f"{base_args['exit_cap_s']:.2f}%",   f"{bull_args['exit_cap_s']:.2f}%"),
+        ("—",                  "—","—","—"),
+        ("NOI",                f"${s_bear['noi']:,.0f}",   f"${s_base['noi']:,.0f}",   f"${s_bull['noi']:,.0f}"),
+        ("Implied Value",      f"${s_bear['value']:,.0f}", f"${s_base['value']:,.0f}", f"${s_bull['value']:,.0f}"),
+        ("DSCR",               f"{s_bear['dscr']:.2f}x",  f"{s_base['dscr']:.2f}x",  f"{s_bull['dscr']:.2f}x"),
+        ("Cash-on-Cash",       f"{s_bear['coc']:.1%}",    f"{s_base['coc']:.1%}",    f"{s_bull['coc']:.1%}"),
+        ("IRR (Unadjusted)",   f"{s_bear['irr']:.1%}",    f"{s_base['irr']:.1%}",    f"{s_bull['irr']:.1%}"),
+        ("IRR (After CapEx)",  f"{s_bear['irr_adj']:.1%}",f"{s_base['irr_adj']:.1%}",f"{s_bull['irr_adj']:.1%}"),
+        ("LP Equity Multiple", f"{s_bear['lp_em']:.2f}x", f"{s_base['lp_em']:.2f}x", f"{s_bull['lp_em']:.2f}x"),
+        ("GP Equity Multiple", f"{s_bear['gp_em']:.2f}x", f"{s_base['gp_em']:.2f}x", f"{s_bull['gp_em']:.2f}x"),
+        ("Sale Price",         f"${s_bear['sale']:,.0f}",  f"${s_base['sale']:,.0f}",  f"${s_bull['sale']:,.0f}"),
+    ]
+    for i, r in enumerate(scenario_rows):
+        row += 1
+        for c, v in enumerate(r, 1):
+            cell = ws2.cell(row=row, column=c, value=v)
+            cell.fill   = hdr_fill(NAVY2 if row%2==0 else NAVY3)
+            cell.font   = Font(name="Calibri", color=WHITE, size=10)
+            cell.border = thin_border()
+            cell.alignment = Alignment(horizontal="left" if c==1 else "center")
+
+    # ════════════════════════════════════════
+    #  SHEET 3 — CAPEX SCHEDULE
+    # ════════════════════════════════════════
+    ws3 = wb.create_sheet("CapEx Schedule")
+    ws3.sheet_view.showGridLines = False
+    ws3.sheet_properties.tabColor = "E74C3C"
+
+    ws3.merge_cells("A1:G1")
+    t3 = ws3["A1"]
+    t3.value = "CAPITAL EXPENDITURE SCHEDULE"
+    t3.fill  = hdr_fill(NAVY)
+    t3.font  = Font(name="Calibri", color=GOLD, bold=True, size=13)
+    t3.alignment = Alignment(horizontal="left", vertical="center")
+    ws3.row_dimensions[1].height = 28
+
+    row = 3
+    write_header_row(ws3, row, [
+        ("Year",10), ("CapEx Reserve",18), ("Tenant Improvements",22),
+        ("Leasing Commissions",20), ("Total Capital Cost",20),
+        ("Levered CF",18), ("Adj. CF (after CapEx)",22)
+    ], NAVY)
+
+    yrs = list(range(1, int(hold_years)+1))
+    noi_by_yr  = [noi*(1+noi_growth/100)**yr for yr in yrs]
+    lev_cf_yr  = [n - annual_debt_service for n in noi_by_yr]
+    cap_yr     = [capex_summary["annual_totals"][yr] for yr in yrs]
+    adj_cf_yr  = [l - c for l, c in zip(lev_cf_yr, cap_yr)]
+
+    for yr in yrs:
+        row += 1
+        s = capex_summary["schedule"][yr]
+        vals = [
+            yr,
+            s.get("CapEx Reserve", 0),
+            s.get("Tenant Improvements", 0),
+            s.get("Leasing Commissions", 0),
+            capex_summary["annual_totals"][yr],
+            lev_cf_yr[yr-1],
+            adj_cf_yr[yr-1],
+        ]
+        write_data_row(ws3, row, vals,
+                       fmt=["General","#,##0","#,##0","#,##0","#,##0","#,##0","#,##0"])
+
+    # Totals row
+    row += 1
+    totals = [
+        "TOTAL",
+        capex_summary["total_capex"],
+        capex_summary["total_ti"],
+        capex_summary["total_lc"],
+        capex_summary["total_cost"],
+        sum(lev_cf_yr),
+        sum(adj_cf_yr),
+    ]
+    for c, v in enumerate(totals, 1):
+        cell = ws3.cell(row=row, column=c, value=v)
+        cell.fill   = hdr_fill(NAVY)
+        cell.font   = Font(name="Calibri", color=GOLD, bold=True, size=10)
+        cell.border = thin_border()
+        cell.alignment = Alignment(horizontal="right" if c>1 else "left")
+        if c > 1 and isinstance(v, float):
+            cell.number_format = "#,##0"
+
+    # ════════════════════════════════════════
+    #  SHEET 4 — WATERFALL
+    # ════════════════════════════════════════
+    ws4 = wb.create_sheet("LP-GP Waterfall")
+    ws4.sheet_view.showGridLines = False
+    ws4.sheet_properties.tabColor = "C9A84C"
+
+    ws4.merge_cells("A1:D1")
+    t4 = ws4["A1"]
+    t4.value = "LP / GP WATERFALL DISTRIBUTION"
+    t4.fill  = hdr_fill(NAVY)
+    t4.font  = Font(name="Calibri", color=GOLD, bold=True, size=13)
+    t4.alignment = Alignment(horizontal="left", vertical="center")
+    ws4.row_dimensions[1].height = 28
+
+    row = 3
+    write_header_row(ws4, row,
+        [("Item",30),("LP",18),("GP",18),("Total",18)], NAVY)
+
+    t = wf_data["tiers"]
+    wf_rows = [
+        ("Return of Capital",   t["lp_return_of_capital"], t["gp_return_of_capital"],
+         t["lp_return_of_capital"]+t["gp_return_of_capital"]),
+        ("Preferred Return",    t["lp_preferred_return"],  0,
+         t["lp_preferred_return"]),
+        ("GP Catch-Up",         0, t["gp_catchup"],        t["gp_catchup"]),
+        ("Promote Tier 1",      t["lp_tier1_promote"],     t["gp_tier1_promote"],
+         t["lp_tier1_promote"]+t["gp_tier1_promote"]),
+        ("Promote Tier 2",      t["lp_tier2_promote"],     t["gp_tier2_promote"],
+         t["lp_tier2_promote"]+t["gp_tier2_promote"]),
+        ("TOTAL",               wf_data["lp_total"],       wf_data["gp_total"],
+         wf_data["lp_total"]+wf_data["gp_total"]),
+    ]
+    for label, lp_v, gp_v, tot in wf_rows:
+        row += 1
+        is_total = label == "TOTAL"
+        for c, v in enumerate([label, lp_v, gp_v, tot], 1):
+            cell = ws4.cell(row=row, column=c, value=v)
+            cell.fill   = hdr_fill(NAVY if is_total else (NAVY2 if row%2==0 else NAVY3))
+            cell.font   = Font(name="Calibri",
+                               color=GOLD if is_total else WHITE,
+                               bold=is_total, size=10)
+            cell.border = thin_border()
+            cell.alignment = Alignment(horizontal="left" if c==1 else "right")
+            if c > 1 and isinstance(v, (int, float)):
+                cell.number_format = "#,##0"
+
+    # ── Key metrics block ────────────────────
+    row += 2
+    summary_rows = [
+        ("LP Equity Invested",  wf_data["lp_equity"]),
+        ("GP Equity Invested",  wf_data["gp_equity"]),
+        ("LP Equity Multiple",  f"{wf_data['lp_em']:.2f}x"),
+        ("GP Equity Multiple",  f"{wf_data['gp_em']:.2f}x"),
+        ("GP Promote % of Profits", f"{wf_data['gp_promote_pct']:.1%}"),
+        ("Pref Return Satisfied", "Yes" if wf_data["pref_satisfied"] else "No"),
+    ]
+    for label, val in summary_rows:
+        row += 1
+        ws4.cell(row=row, column=1, value=label).fill = hdr_fill(NAVY3)
+        ws4.cell(row=row, column=1).font   = num_font()
+        ws4.cell(row=row, column=1).border = thin_border()
+        ws4.cell(row=row, column=1).alignment = Alignment(horizontal="left")
+        cell = ws4.cell(row=row, column=2, value=val)
+        cell.fill   = hdr_fill(NAVY3)
+        cell.font   = Font(name="Calibri", color=GOLD, bold=True, size=10)
+        cell.border = thin_border()
+        cell.alignment = Alignment(horizontal="right")
+        if isinstance(val, float):
+            cell.number_format = "#,##0"
+
+    # ════════════════════════════════════════
+    #  SHEET 5 — RENT ROLL (if uploaded)
+    # ════════════════════════════════════════
+    if rent_roll_df is not None:
+        ws5 = wb.create_sheet("Rent Roll")
+        ws5.sheet_view.showGridLines = False
+        ws5.sheet_properties.tabColor = "2ECC71"
+
+        ws5.merge_cells("A1:J1")
+        t5 = ws5["A1"]
+        t5.value = "RENT ROLL"
+        t5.fill  = hdr_fill(NAVY)
+        t5.font  = Font(name="Calibri", color=GOLD, bold=True, size=13)
+        t5.alignment = Alignment(horizontal="left", vertical="center")
+        ws5.row_dimensions[1].height = 28
+
+        row = 3
+        write_header_row(ws5, row, [
+            ("Tenant",22), ("SF",12), ("Lease End",14),
+            ("Mo. to Exp.",12), ("Risk",12),
+            ("In-Place $/SF",14), ("Market $/SF",14),
+            ("Mark-to-Mkt",14), ("Ann. Revenue",16),
+            ("Renewal Prob",14)
+        ], NAVY)
+
+        for _, t_row in rent_roll_df.iterrows():
+            row += 1
+            mtm = t_row["mark_to_market_pct"]
+            risk_str = str(t_row["risk"])
+            if "Critical" in risk_str:   risk_color = RED
+            elif "Watch" in risk_str:    risk_color = AMBER
+            else:                        risk_color = GREEN
+            mtm_color = GREEN if mtm >= 0 else RED
+
+            vals = [
+                t_row["tenant"],
+                t_row["sf"],
+                str(t_row["lease_end"]),
+                round(t_row["months_to_expiry"]),
+                risk_str,
+                t_row["current_rent_psf"],
+                t_row["market_rent_psf"],
+                t_row["mark_to_market_pct"],
+                t_row["annual_revenue"],
+                t_row["renewal_prob"],
+            ]
+            fmts = ["General","#,##0","General","General","General",
+                    "#,##0.00","#,##0.00","0.0%","#,##0","0%"]
+            colors = [WHITE,WHITE,WHITE,WHITE,risk_color,
+                      WHITE,WHITE,mtm_color,WHITE,WHITE]
+            for c, (v, f, col) in enumerate(zip(vals, fmts, colors), 1):
+                cell = ws5.cell(row=row, column=c, value=v)
+                cell.fill   = hdr_fill(NAVY2 if row%2==0 else NAVY3)
+                cell.font   = Font(name="Calibri", color=col, size=10)
+                cell.border = thin_border()
+                cell.alignment = Alignment(
+                    horizontal="left" if c==1 else "right",
+                    vertical="center"
+                )
+                cell.number_format = f
+
+    # ── Save to bytes buffer ─────────────────
+    buf = io.BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf.getvalue()
+
 # Run waterfall with current inputs
 # Use the operating cash flows (exclude sale, which we pass separately)
 wf = build_waterfall(
@@ -874,17 +1299,57 @@ def build_rent_roll(df, hold_yrs, today=None):
 # ─────────────────────────────────────────────
 #  PAGE HEADER
 # ─────────────────────────────────────────────
-st.markdown(f"""
-<div class="page-header">
-    <div class="page-header-left">
-        <h1>{"Industrial Asset — " + address if address else "Industrial Asset Underwriting"}</h1>
-        <p>{f"{square_feet:,} RSF · Built {year_built} · {cap_rate:.2f}% Cap · {ltv:.0f}% LTV"}</p>
+# ── Build export (runs every time inputs change) ──
+# We pass rent_roll_df only if the user has uploaded one
+# st.session_state stores it between reruns
+_rr_export = st.session_state.get("rent_roll_df_export", None)
+excel_bytes = build_excel_export(
+    address=address, square_feet=square_feet, year_built=year_built,
+    rent_psf=rent_psf, occupancy=occupancy, other_income=other_income,
+    mgmt_fee_pct=mgmt_fee_pct, insurance_psf=insurance_psf,
+    re_taxes_psf=re_taxes_psf, maintenance_psf=maintenance_psf,
+    gross_potential_income=gross_potential_income, vacancy_loss=vacancy_loss,
+    egi=egi, mgmt_fee=mgmt_fee, insurance=insurance, re_taxes=re_taxes,
+    maintenance=maintenance, total_expenses=total_expenses, noi=noi,
+    cap_rate=cap_rate, value=value, loan_amount=loan_amount,
+    annual_debt_service=annual_debt_service, dscr=dscr,
+    levered_cash_flow=levered_cash_flow, equity_invested=equity_invested,
+    cash_on_cash=cash_on_cash, irr=irr, irr_adj=irr_adj,
+    sale_price=sale_price, sale_proceeds=sale_proceeds,
+    hold_years=hold_years, noi_growth=noi_growth, exit_cap=exit_cap,
+    capex_summary=capex_summary, wf_data=wf,
+    s_bear=s_bear, s_base=s_base, s_bull=s_bull,
+    bear_args=bear_args, base_args=base_args, bull_args=bull_args,
+    lp_equity_pct=lp_equity_pct, pref_return=pref_return,
+    promote_tier1=promote_tier1, hurdle_tier1=hurdle_tier1,
+    promote_tier2=promote_tier2, hurdle_tier2=hurdle_tier2,
+    rent_roll_df=_rr_export,
+)
+
+# ── Page header with export button ──────────
+header_col, btn_col = st.columns([4, 1])
+with header_col:
+    st.markdown(f"""
+    <div class="page-header">
+        <div class="page-header-left">
+            <h1>{"Industrial Asset — " + address if address else "Industrial Asset Underwriting"}</h1>
+            <p>{f"{square_feet:,} RSF · Built {year_built} · {cap_rate:.2f}% Cap · {ltv:.0f}% LTV"}</p>
+        </div>
+        <div>
+            <span class="status-badge {badge_class}">{badge_text}</span>
+        </div>
     </div>
-    <div>
-        <span class="status-badge {badge_class}">{badge_text}</span>
-    </div>
-</div>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
+with btn_col:
+    st.markdown("<div style='height:1.2rem'></div>", unsafe_allow_html=True)
+    fname = f"underwriting_{address.replace(' ','_').replace(',','')[:30]}.xlsx" if address else "underwriting_export.xlsx"
+    st.download_button(
+        label="⬇ Export to Excel",
+        data=excel_bytes,
+        file_name=fname,
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        use_container_width=True,
+    )
 
 
 # ─────────────────────────────────────────────
@@ -1084,9 +1549,13 @@ Cold Chain Logistics,12000,2023-01-01,2030-12-31,7.25,3.0,0.85,7.50,3"""
         # ── Read CSV ─────────────────────────
         # pd.read_csv parses the uploaded file into a DataFrame
         df_raw = pd.read_csv(uploaded)
+        # Store enriched df in session state so Excel export can use it
+        # st.session_state persists values across Streamlit reruns
 
         # ── Run rent roll model ───────────────
         df_rr, summary = build_rent_roll(df_raw.copy(), hold_years)
+        # Save to session state for Excel export
+        st.session_state["rent_roll_df_export"] = df_rr
 
         # ── Portfolio summary cards ───────────
         section("Portfolio Overview")
