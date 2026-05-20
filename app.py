@@ -746,8 +746,8 @@ def build_excel_export(
     ws1.merge_cells("A1:D1")
     title = ws1["A1"]
     title.value = f"INDUSTRIAL ASSET UNDERWRITING — {address.upper() if address else 'UNNAMED ASSET'}"
-    title.fill  = hdr_fill("7B9BB8")
-    title.font  = Font(name="Calibri", color="FFFFFF", bold=True, size=13)
+    title.fill  = hdr_fill("B8CCE4")
+    title.font  = Font(name="Calibri", color="1B2A4A", bold=True, size=13)
     title.alignment = Alignment(horizontal="left", vertical="center")
     ws1.row_dimensions[1].height = 28
 
@@ -763,8 +763,8 @@ def build_excel_export(
     ws1.merge_cells(f"A{row}:D{row}")
     sec = ws1[f"A{row}"]
     sec.value = "NOI BUILD"
-    sec.fill  = hdr_fill("7B9BB8")
-    sec.font  = Font(name="Calibri", color="FFFFFF", bold=True, size=10)
+    sec.fill  = hdr_fill("B8CCE4")
+    sec.font  = Font(name="Calibri", color="1B2A4A", bold=True, size=10)
 
     row += 1
     write_header_row(ws1, row,
@@ -798,12 +798,12 @@ def build_excel_export(
     ws1.merge_cells(f"A{row}:D{row}")
     sec2 = ws1[f"A{row}"]
     sec2.value = "DEBT & RETURNS"
-    sec2.fill  = hdr_fill("7B9BB8")
-    sec2.font  = Font(name="Calibri", color="FFFFFF", bold=True, size=10)
+    sec2.fill  = hdr_fill("B8CCE4")
+    sec2.font  = Font(name="Calibri", color="1B2A4A", bold=True, size=10)
 
     row += 1
     write_header_row(ws1, row,
-        [("Metric",30),("Value",18),("Threshold",18),("Status",14)], NAVY)
+        [("Metric",30),("Value",18),("Threshold",18),("Status",14)], "D6EAFF")
 
     debt_rows = [
         ("Implied Property Value",   value,                "—",        "—"),
@@ -847,14 +847,14 @@ def build_excel_export(
     ws2.merge_cells("A1:D1")
     t2 = ws2["A1"]
     t2.value = "SCENARIO ANALYSIS — BEAR / BASE / BULL"
-    t2.fill  = hdr_fill("7B9BB8")
-    t2.font  = Font(name="Calibri", color="FFFFFF", bold=True, size=13)
+    t2.fill  = hdr_fill("B8CCE4")
+    t2.font  = Font(name="Calibri", color="1B2A4A", bold=True, size=13)
     t2.alignment = Alignment(horizontal="left", vertical="center")
     ws2.row_dimensions[1].height = 28
 
     row = 3
     write_header_row(ws2, row,
-        [("Metric",28),("Bear",18),("Base",18),("Bull",18)], NAVY)
+        [("Metric",28),("Bear",18),("Base",18),("Bull",18)], "D6EAFF")
 
     scenario_rows = [
         ("Occupancy",          f"{bear_args['occupancy_s']:.0%}",   f"{base_args['occupancy_s']:.0%}",   f"{bull_args['occupancy_s']:.0%}"),
@@ -890,8 +890,8 @@ def build_excel_export(
     ws3.merge_cells("A1:G1")
     t3 = ws3["A1"]
     t3.value = "CAPITAL EXPENDITURE SCHEDULE"
-    t3.fill  = hdr_fill("7B9BB8")
-    t3.font  = Font(name="Calibri", color="FFFFFF", bold=True, size=13)
+    t3.fill  = hdr_fill("B8CCE4")
+    t3.font  = Font(name="Calibri", color="1B2A4A", bold=True, size=13)
     t3.alignment = Alignment(horizontal="left", vertical="center")
     ws3.row_dimensions[1].height = 28
 
@@ -900,7 +900,7 @@ def build_excel_export(
         ("Year",10), ("CapEx Reserve",18), ("Tenant Improvements",22),
         ("Leasing Commissions",20), ("Total Capital Cost",20),
         ("Levered CF",18), ("Adj. CF (after CapEx)",22)
-    ], NAVY)
+    ], "D6EAFF")
 
     yrs = list(range(1, int(hold_years)+1))
     noi_by_yr  = [noi*(1+noi_growth/100)**yr for yr in yrs]
@@ -936,8 +936,8 @@ def build_excel_export(
     ]
     for c, v in enumerate(totals, 1):
         cell = ws3.cell(row=row, column=c, value=v)
-        cell.fill   = hdr_fill("7B9BB8")
-        cell.font   = Font(name="Calibri", color="FFFFFF", bold=True, size=10)
+        cell.fill   = hdr_fill("D6EAFF")
+        cell.font   = Font(name="Calibri", color="000000", bold=True, size=10)
         cell.border = thin_border()
         cell.alignment = Alignment(horizontal="right" if c>1 else "left")
         if c > 1 and isinstance(v, float):
@@ -953,14 +953,14 @@ def build_excel_export(
     ws4.merge_cells("A1:D1")
     t4 = ws4["A1"]
     t4.value = "LP / GP WATERFALL DISTRIBUTION"
-    t4.fill  = hdr_fill("7B9BB8")
-    t4.font  = Font(name="Calibri", color="FFFFFF", bold=True, size=13)
+    t4.fill  = hdr_fill("B8CCE4")
+    t4.font  = Font(name="Calibri", color="1B2A4A", bold=True, size=13)
     t4.alignment = Alignment(horizontal="left", vertical="center")
     ws4.row_dimensions[1].height = 28
 
     row = 3
     write_header_row(ws4, row,
-        [("Item",30),("LP",18),("GP",18),("Total",18)], NAVY)
+        [("Item",30),("LP",18),("GP",18),("Total",18)], "D6EAFF")
 
     t = wf_data["tiers"]
     wf_rows = [
@@ -981,9 +981,9 @@ def build_excel_export(
         is_total = label == "TOTAL"
         for c, v in enumerate([label, lp_v, gp_v, tot], 1):
             cell = ws4.cell(row=row, column=c, value=v)
-            cell.fill   = hdr_fill("4A5F7A" if is_total else (NAVY2 if row%2==0 else NAVY3))
+            cell.fill   = hdr_fill("D6EAFF" if is_total else (NAVY2 if row%2==0 else NAVY3))
             cell.font   = Font(name="Calibri",
-                               color="FFFFFF" if is_total else "000000",
+                               color="000000",
                                bold=is_total, size=10)
             cell.border = thin_border()
             cell.alignment = Alignment(horizontal="left" if c==1 else "right")
@@ -1002,7 +1002,7 @@ def build_excel_export(
     ]
     for label, val in summary_rows:
         row += 1
-        ws4.cell(row=row, column=1, value=label).fill = hdr_fill(NAVY3)
+        ws4.cell(row=row, column=1, value=label).fill = hdr_fill("F8FAFB")
         ws4.cell(row=row, column=1).font   = num_font()
         ws4.cell(row=row, column=1).border = thin_border()
         ws4.cell(row=row, column=1).alignment = Alignment(horizontal="left")
@@ -1023,8 +1023,8 @@ def build_excel_export(
     ws_cf.merge_cells("A1:H1")
     t_cf = ws_cf["A1"]
     t_cf.value = "10-YEAR CASH FLOW PROJECTION"
-    t_cf.fill  = hdr_fill("7B9BB8")
-    t_cf.font  = Font(name="Calibri", color="FFFFFF", bold=True, size=13)
+    t_cf.fill  = hdr_fill("B8CCE4")
+    t_cf.font  = Font(name="Calibri", color="1B2A4A", bold=True, size=13)
     t_cf.alignment = Alignment(horizontal="left", vertical="center")
     ws_cf.row_dimensions[1].height = 28
     row = 3
@@ -1068,8 +1068,8 @@ def build_excel_export(
         ws5.merge_cells("A1:J1")
         t5 = ws5["A1"]
         t5.value = "RENT ROLL"
-        t5.fill  = hdr_fill("7B9BB8")
-        t5.font  = Font(name="Calibri", color="FFFFFF", bold=True, size=13)
+        t5.fill  = hdr_fill("B8CCE4")
+        t5.font  = Font(name="Calibri", color="1B2A4A", bold=True, size=13)
         t5.alignment = Alignment(horizontal="left", vertical="center")
         ws5.row_dimensions[1].height = 28
 
@@ -1080,7 +1080,7 @@ def build_excel_export(
             ("In-Place $/SF",14), ("Market $/SF",14),
             ("Mark-to-Mkt",14), ("Ann. Revenue",16),
             ("Renewal Prob",14)
-        ], NAVY)
+        ], "D6EAFF")
 
         for _, t_row in rent_roll_df.iterrows():
             row += 1
